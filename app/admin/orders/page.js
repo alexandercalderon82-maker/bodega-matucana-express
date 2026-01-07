@@ -1,3 +1,5 @@
+import AdminGuard from "@/components/AdminGuard";
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -51,6 +53,7 @@ export default function AdminOrders() {
   }, []);
 
   return (
+    <AdminGuard>
     <main className="min-h-screen bg-black text-white px-6 py-10">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between gap-4">
@@ -185,5 +188,6 @@ export default function AdminOrders() {
         )}
       </div>
     </main>
+    </AdminGuard>
   );
 }

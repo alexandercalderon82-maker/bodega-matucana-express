@@ -1,5 +1,8 @@
+import AdminGuard from "@/components/AdminGuard";
+
 export default function AdminHome() {
   return (
+    <AdminGuard>
     <main className="min-h-screen bg-black text-white px-6 py-10">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold">Panel Admin</h1>
@@ -30,5 +33,6 @@ export default function AdminHome() {
         </div>
       </div>
     </main>
+    </AdminGuard>
   );
 }
