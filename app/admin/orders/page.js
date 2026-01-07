@@ -1,7 +1,6 @@
-import AdminGuard from "@/components/AdminGuard";
-
 "use client";
 
+import AdminGuard from "@/components/AdminGuard";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
