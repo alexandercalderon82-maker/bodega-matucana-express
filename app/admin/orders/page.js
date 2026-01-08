@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AdminGuard from "@/components/AdminGuard";
 
@@ -9,6 +9,10 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [items, setItems] = useState([]);
+
+  // ✅ NUEVO: filtros
+  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | delivered
+  const [search, setSearch] = useState("");
 
   // ✅ Cargar pedidos
   const loadOrders = async () => {
@@ -57,10 +61,8 @@ export default function AdminOrders() {
       return;
     }
 
-    // refrescar lista
     await loadOrders();
 
-    // si está seleccionado, actualizar también
     if (selectedOrder?.id === orderId) {
       setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
     }
@@ -70,6 +72,23 @@ export default function AdminOrders() {
     loadOrders();
   }, []);
 
+  // ✅ NUEVO: filtrar pedidos
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      const statusOk =
+        statusFilter === "all" ? true : o.status === statusFilter;
+
+      const q = search.trim().toLowerCase();
+      const searchOk =
+        q === ""
+          ? true
+          : (o.customer_name || "").toLowerCase().includes(q) ||
+            (o.phone || "").toLowerCase().includes(q);
+
+      return statusOk && searchOk;
+    });
+  }, [orders, statusFilter, search]);
+
   return (
     <AdminGuard>
       <main style={{ padding: 20, fontFamily: "Arial" }}>
@@ -78,25 +97,62 @@ export default function AdminOrders() {
           Aquí verás todos los pedidos guardados en Supabase.
         </p>
 
-        <button
-          onClick={loadOrders}
+        {/* ✅ NUEVO: filtros */}
+        <div
           style={{
-            marginTop: 10,
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "none",
-            cursor: "pointer",
-            background: "black",
-            color: "white",
+            marginTop: 12,
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "center",
           }}
         >
-          🔄 Actualizar
-        </button>
+          <button
+            onClick={loadOrders}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "none",
+              cursor: "pointer",
+              background: "black",
+              color: "white",
+            }}
+          >
+            🔄 Actualizar
+          </button>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid #ddd",
+            }}
+          >
+            <option value="all">Todos</option>
+            <option value="pending">Pendientes</option>
+            <option value="delivered">Entregados</option>
+          </select>
+
+          <input
+            placeholder="Buscar por nombre o celular..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid #ddd",
+              minWidth: 260,
+              flex: 1,
+            }}
+          />
+        </div>
 
         {loading ? (
           <p style={{ marginTop: 20 }}>Cargando pedidos...</p>
-        ) : orders.length === 0 ? (
-          <p style={{ marginTop: 20 }}>Aún no hay pedidos.</p>
+        ) : filteredOrders.length === 0 ? (
+          <p style={{ marginTop: 20 }}>No hay pedidos con ese filtro.</p>
         ) : (
           <div
             style={{
@@ -109,7 +165,7 @@ export default function AdminOrders() {
           >
             {/* ✅ Lista de pedidos */}
             <section>
-              {orders.map((o) => (
+              {filteredOrders.map((o) => (
                 <div
                   key={o.id}
                   onClick={() => {
