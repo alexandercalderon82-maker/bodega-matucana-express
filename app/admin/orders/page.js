@@ -68,7 +68,7 @@ export default function AdminOrders() {
     }
   };
 
-  // ✅ NUEVO: COPIAR PEDIDO
+  // ✅ COPIAR PEDIDO
   const copyOrderToClipboard = async () => {
     if (!selectedOrder) return;
 
@@ -112,11 +112,58 @@ ${itemsText}
     }
   };
 
+  // ✅ NUEVO: ENVIAR PEDIDO AL CLIENTE POR WHATSAPP
+  const sendOrderByWhatsapp = () => {
+    if (!selectedOrder) return;
+
+    const cleanPhone = String(selectedOrder.phone || "").replace(/\D/g, "");
+    if (!cleanPhone) {
+      alert("Este pedido no tiene celular válido.");
+      return;
+    }
+
+    const itemsText =
+      items.length === 0
+        ? "(Sin productos)"
+        : items
+            .map(
+              (it) =>
+                `• ${it.name_snapshot} x${it.quantity} — S/ ${(Number(it.price_snapshot) * it.quantity).toFixed(2)}`
+            )
+            .join("\n");
+
+    const msg = `
+📋 *PEDIDO - Bodega Matucana Express*
+
+👤 *Nombre:* ${selectedOrder.customer_name}
+📱 *Celular:* ${selectedOrder.phone}
+
+🚚 *Tipo:* ${
+      selectedOrder.delivery_type === "delivery" ? "Delivery" : "Recojo"
+    }
+📍 *Dirección:* ${selectedOrder.address || "-"}
+
+🛒 *Productos:*
+${itemsText}
+
+📝 *Subtotal:* S/ ${Number(selectedOrder.subtotal).toFixed(2)}
+🚚 *Delivery:* S/ ${Number(selectedOrder.delivery_fee).toFixed(2)}
+💰 *Total:* S/ ${Number(selectedOrder.total).toFixed(2)}
+
+🗒️ *Nota:* ${selectedOrder.note || "Sin nota"}
+`.trim();
+
+    const encoded = encodeURIComponent(msg);
+    const url = `https://wa.me/51${cleanPhone}?text=${encoded}`;
+
+    window.open(url, "_blank");
+  };
+
   useEffect(() => {
     loadOrders();
   }, []);
 
-  // ✅ NUEVO: filtrar pedidos
+  // ✅ filtrar pedidos
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       const statusOk =
@@ -141,7 +188,7 @@ ${itemsText}
           Aquí verás todos los pedidos guardados en Supabase.
         </p>
 
-        {/* ✅ NUEVO: filtros */}
+        {/* ✅ filtros */}
         <div
           style={{
             marginTop: 12,
@@ -223,7 +270,6 @@ ${itemsText}
                     marginBottom: 12,
                     cursor: "pointer",
 
-                    // ✅ CAMBIO: entregados en verde
                     background:
                       selectedOrder?.id === o.id
                         ? "#f0f0f0"
@@ -316,7 +362,7 @@ ${itemsText}
                     💬 Abrir WhatsApp del cliente
                   </button>
 
-                  {/* ✅ NUEVO: BOTÓN COPIAR PEDIDO */}
+                  {/* ✅ BOTÓN COPIAR PEDIDO */}
                   <button
                     onClick={copyOrderToClipboard}
                     style={{
@@ -332,6 +378,24 @@ ${itemsText}
                     }}
                   >
                     📋 Copiar pedido
+                  </button>
+
+                  {/* ✅ NUEVO: ENVIAR PEDIDO */}
+                  <button
+                    onClick={sendOrderByWhatsapp}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      background: "black",
+                      color: "white",
+                      fontWeight: "bold",
+                      marginTop: 10,
+                    }}
+                  >
+                    📩 Enviar pedido al cliente
                   </button>
 
                   <p style={{ marginTop: 12 }}>
