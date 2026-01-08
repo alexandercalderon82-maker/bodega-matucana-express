@@ -1,44 +1,26 @@
 "use client";
 
-import AdminGuard from "@/components/AdminGuard";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import AdminGuard from "@/components/AdminGuard";
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [items, setItems] = useState([]);
 
+  // ✅ Cargar pedidos
   const loadOrders = async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("orders")
-      .select(
-        `
-        id,
-        created_at,
-        customer_name,
-        phone,
-        delivery_type,
-        address,
-        note,
-        subtotal,
-        delivery_fee,
-        total,
-        order_items (
-          id,
-          name_snapshot,
-          price_snapshot,
-          quantity,
-          subtotal
-        )
-      `
-      )
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
-      alert("Error cargando pedidos. Revisa consola.");
+      console.error("Error cargando pedidos:", error.message);
       setOrders([]);
     } else {
       setOrders(data || []);
@@ -47,146 +29,253 @@ export default function AdminOrders() {
     setLoading(false);
   };
 
+  // ✅ Cargar items de un pedido
+  const loadItems = async (orderId) => {
+    const { data, error } = await supabase
+      .from("order_items")
+      .select("*")
+      .eq("order_id", orderId);
+
+    if (error) {
+      console.error("Error cargando items:", error.message);
+      setItems([]);
+    } else {
+      setItems(data || []);
+    }
+  };
+
+  // ✅ Cambiar estado del pedido
+  const updateStatus = async (orderId, newStatus) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: newStatus })
+      .eq("id", orderId);
+
+    if (error) {
+      console.error("Error actualizando estado:", error.message);
+      alert("❌ Error actualizando estado");
+      return;
+    }
+
+    // refrescar lista
+    await loadOrders();
+
+    // si está seleccionado, actualizar también
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+    }
+  };
+
   useEffect(() => {
     loadOrders();
   }, []);
 
   return (
     <AdminGuard>
-    <main className="min-h-screen bg-black text-white px-6 py-10">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between gap-4">
-          <a
-            href="/admin"
-            className="inline-block text-gray-300 hover:text-white transition"
-          >
-            ⬅ Volver
-          </a>
-
-          <button
-            onClick={loadOrders}
-            className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15 transition"
-          >
-            🔄 Actualizar
-          </button>
-        </div>
-
-        <h1 className="text-3xl font-bold mt-3">Admin — Pedidos</h1>
-        <p className="text-gray-300 mt-2">
-          Aquí verás todos los pedidos que se guarden en Supabase.
+      <main style={{ padding: 20, fontFamily: "Arial" }}>
+        <h1 style={{ fontSize: 26, fontWeight: "bold" }}>📦 Admin — Pedidos</h1>
+        <p style={{ color: "#666" }}>
+          Aquí verás todos los pedidos guardados en Supabase.
         </p>
 
+        <button
+          onClick={loadOrders}
+          style={{
+            marginTop: 10,
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: "black",
+            color: "white",
+          }}
+        >
+          🔄 Actualizar
+        </button>
+
         {loading ? (
-          <p className="text-gray-300 mt-8">Cargando pedidos...</p>
+          <p style={{ marginTop: 20 }}>Cargando pedidos...</p>
         ) : orders.length === 0 ? (
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
-            <p className="text-gray-300">Aún no hay pedidos.</p>
-            <p className="text-gray-400 text-sm mt-2">
-              Cuando un cliente haga checkout, aquí aparecerá el pedido.
-            </p>
-          </div>
+          <p style={{ marginTop: 20 }}>Aún no hay pedidos.</p>
         ) : (
-          <div className="mt-8 space-y-4">
-            {orders.map((o) => (
-              <div
-                key={o.id}
-                className="rounded-2xl border border-white/10 bg-white/5 p-5"
-              >
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-lg font-bold break-all">Pedido #{o.id}</p>
-                    <p className="text-sm text-gray-300 mt-1">
-                      📅 {new Date(o.created_at).toLocaleString()}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
+              gap: 20,
+              marginTop: 20,
+              alignItems: "start",
+            }}
+          >
+            {/* ✅ Lista de pedidos */}
+            <section>
+              {orders.map((o) => (
+                <div
+                  key={o.id}
+                  onClick={() => {
+                    setSelectedOrder(o);
+                    loadItems(o.id);
+                  }}
+                  style={{
+                    border: "1px solid #ddd",
+                    padding: 12,
+                    borderRadius: 10,
+                    marginBottom: 12,
+                    cursor: "pointer",
+                    background:
+                      selectedOrder?.id === o.id ? "#f9f9f9" : "white",
+                  }}
+                >
+                  <p style={{ margin: 0, fontWeight: "bold" }}>
+                    👤 {o.customer_name} — 📱 {o.phone}
+                  </p>
+                  <p style={{ margin: 0, color: "#555" }}>
+                    💰 Total: S/ {Number(o.total).toFixed(2)}
+                  </p>
+
+                  <p style={{ margin: 0, color: "#777", fontSize: 13 }}>
+                    📅 {new Date(o.created_at).toLocaleString()}
+                  </p>
+
+                  <p style={{ margin: "6px 0 0 0" }}>
+                    <b>Estado:</b>{" "}
+                    <span
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 8,
+                        background:
+                          o.status === "delivered" ? "#d4edda" : "#fff3cd",
+                        color:
+                          o.status === "delivered" ? "#155724" : "#856404",
+                        fontSize: 13,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {o.status === "delivered" ? "✅ Entregado" : "⏳ Pendiente"}
+                    </span>
+                  </p>
+                </div>
+              ))}
+            </section>
+
+            {/* ✅ Detalle del pedido */}
+            <aside
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: 12,
+                padding: 12,
+                background: "white",
+                position: "sticky",
+                top: 20,
+                height: "fit-content",
+              }}
+            >
+              {!selectedOrder ? (
+                <p style={{ color: "#666" }}>
+                  Selecciona un pedido para ver los detalles.
+                </p>
+              ) : (
+                <>
+                  <h2 style={{ marginTop: 0 }}>🧾 Detalle</h2>
+
+                  <p>
+                    <b>Cliente:</b> {selectedOrder.customer_name}
+                  </p>
+                  <p>
+                    <b>Celular:</b> {selectedOrder.phone}
+                  </p>
+
+                  <p>
+                    <b>Tipo:</b>{" "}
+                    {selectedOrder.delivery_type === "delivery"
+                      ? "🚚 Delivery"
+                      : "🏪 Recojo"}
+                  </p>
+
+                  {selectedOrder.delivery_type === "delivery" && (
+                    <p>
+                      <b>Dirección:</b> {selectedOrder.address || "-"}
                     </p>
+                  )}
 
-                    <div className="mt-3 text-sm text-gray-200 space-y-1">
-                      <p>
-                        👤 <b>{o.customer_name || "-"}</b>
-                      </p>
-                      <p>
-                        📱 <b>{o.phone || "-"}</b>
-                      </p>
-                      <p>
-                        {o.delivery_type === "delivery" ? "🚚 Delivery" : "🏪 Recojo"}
-                      </p>
+                  <p>
+                    <b>Nota:</b> {selectedOrder.note || "Sin nota"}
+                  </p>
 
-                      {o.delivery_type === "delivery" && (
-                        <p>
-                          📍 <b>{o.address || "-"}</b>
-                        </p>
-                      )}
+                  <hr />
 
-                      {o.note && (
-                        <p>
-                          📝 <b>{o.note}</b>
-                        </p>
-                      )}
-                    </div>
+                  <h3>🛒 Productos</h3>
+
+                  {items.length === 0 ? (
+                    <p style={{ color: "#666" }}>Sin productos.</p>
+                  ) : (
+                    <ul style={{ paddingLeft: 18 }}>
+                      {items.map((it) => (
+                        <li key={it.id} style={{ marginBottom: 6 }}>
+                          {it.name_snapshot} x{it.quantity} — S/{" "}
+                          {(Number(it.price_snapshot) * it.quantity).toFixed(2)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <hr />
+
+                  <p>
+                    <b>Subtotal:</b> S/{" "}
+                    {Number(selectedOrder.subtotal).toFixed(2)}
+                  </p>
+                  <p>
+                    <b>Delivery:</b> S/{" "}
+                    {Number(selectedOrder.delivery_fee).toFixed(2)}
+                  </p>
+                  <p style={{ fontSize: 18 }}>
+                    <b>Total:</b> S/ {Number(selectedOrder.total).toFixed(2)}
+                  </p>
+
+                  <hr />
+
+                  {/* ✅ Botones de estado */}
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => updateStatus(selectedOrder.id, "pending")}
+                      style={{
+                        flex: 1,
+                        padding: "10px",
+                        borderRadius: 10,
+                        border: "none",
+                        cursor: "pointer",
+                        background: "#ffc107",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ⏳ Pendiente
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        updateStatus(selectedOrder.id, "delivered")
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "10px",
+                        borderRadius: 10,
+                        border: "none",
+                        cursor: "pointer",
+                        background: "#28a745",
+                        color: "white",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ✅ Entregado
+                    </button>
                   </div>
-
-                  <div className="text-sm">
-                    <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                      <p>
-                        Subtotal:{" "}
-                        <b>S/ {Number(o.subtotal || 0).toFixed(2)}</b>
-                      </p>
-                      <p>
-                        Delivery:{" "}
-                        <b>S/ {Number(o.delivery_fee || 0).toFixed(2)}</b>
-                      </p>
-                      <p className="text-base mt-2">
-                        Total:{" "}
-                        <b>S/ {Number(o.total || 0).toFixed(2)}</b>
-                      </p>
-                    </div>
-
-                    {o.phone && (
-                      <a
-                        className="block mt-3"
-                        href={`https://wa.me/${String(o.phone).replace(/\D/g, "")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <button className="w-full rounded-xl bg-green-500 text-black px-4 py-2 font-bold hover:opacity-90 transition">
-                          Abrir WhatsApp
-                        </button>
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <hr className="my-4 border-white/10" />
-
-                <div>
-                  <p className="font-bold">🛒 Items</p>
-                  <div className="mt-2 space-y-2">
-                    {(o.order_items || []).map((it) => (
-                      <div
-                        key={it.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-4 py-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-semibold truncate">
-                            {it.quantity}x {it.name_snapshot}
-                          </p>
-                          <p className="text-xs text-gray-300">
-                            S/ {Number(it.price_snapshot).toFixed(2)} c/u
-                          </p>
-                        </div>
-
-                        <p className="font-bold">
-                          S/ {Number(it.subtotal).toFixed(2)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
+                </>
+              )}
+            </aside>
           </div>
         )}
-      </div>
-    </main>
+      </main>
     </AdminGuard>
   );
 }

@@ -19,6 +19,9 @@ export default function Home() {
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
 
+  // ✅ ✅ NUEVO: mensaje de éxito (reemplaza el alert final)
+  const [successMsg, setSuccessMsg] = useState("");
+
   // ✅ Cargar productos
   const loadProducts = async () => {
     setLoading(true);
@@ -86,7 +89,7 @@ export default function Home() {
   const deliveryFee = deliveryType === "delivery" ? DELIVERY_FEE : 0;
   const total = subtotal + deliveryFee;
 
-  // ✅ Mensaje WhatsApp (OPCIÓN 1)
+  // ✅ Mensaje WhatsApp
   const buildWhatsappMessage = () => {
     const itemsText =
       cart.length === 0
@@ -94,7 +97,9 @@ export default function Home() {
         : cart
             .map(
               (item) =>
-                `• ${item.name} x${item.qty} — S/ ${(Number(item.price) * item.qty).toFixed(2)}`
+                `• ${item.name} x${item.qty} — S/ ${(
+                  Number(item.price) * item.qty
+                ).toFixed(2)}`
             )
             .join("\n");
 
@@ -127,7 +132,7 @@ ${itemsText}
     return msg;
   };
 
-  const sendWhatsapp = () => {
+  const sendWhatsapp = async () => {
     if (!customerName.trim() || !phone.trim()) {
       alert("Completa tu nombre y celular.");
       return;
@@ -143,11 +148,72 @@ ${itemsText}
       return;
     }
 
-    const message = buildWhatsappMessage();
-    const encoded = encodeURIComponent(message);
+    try {
+      // ✅ 1) Guardar pedido en tabla orders
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .insert([
+          {
+            customer_name: customerName,
+            phone: phone,
+            delivery_type: deliveryType,
+            address: deliveryType === "delivery" ? address : null,
+            note: note,
+            subtotal: subtotal,
+            delivery_fee: deliveryFee,
+            total: total,
+          },
+        ])
+        .select()
+        .single();
 
-    const whatsappURL = `https://wa.me/51908953959?text=${encoded}`;
-    window.open(whatsappURL, "_blank");
+      if (orderError) {
+        console.error("Error guardando order:", orderError.message);
+        alert("❌ Error guardando el pedido en Supabase.");
+        return;
+      }
+
+      // ✅ 2) Guardar productos en tabla order_items
+      const itemsToInsert = cart.map((item) => ({
+        order_id: orderData.id,
+        product_id: item.id,
+        name_snapshot: item.name,
+        price_snapshot: Number(item.price),
+        quantity: item.qty,
+        subtotal: Number(item.price) * item.qty,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(itemsToInsert);
+
+      if (itemsError) {
+        console.error("Error guardando items:", itemsError.message);
+        alert("❌ Error guardando productos del pedido.");
+        return;
+      }
+
+      // ✅ 3) Abrir WhatsApp
+      const message = buildWhatsappMessage();
+      const encoded = encodeURIComponent(message);
+
+      const whatsappURL = `https://wa.me/51908953959?text=${encoded}`;
+      window.open(whatsappURL, "_blank");
+
+      // ✅ 4) Limpiar carrito y campos
+      setCart([]);
+      setCustomerName("");
+      setPhone("");
+      setAddress("");
+      setNote("");
+
+      // ✅ ✅ NUEVO: Mensaje bonito dentro del carrito
+      setSuccessMsg("✅ Pedido guardado en Supabase y WhatsApp listo para enviar.");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      console.error("Error general:", err);
+      alert("❌ Ocurrió un error inesperado.");
+    }
   };
 
   return (
@@ -269,7 +335,23 @@ ${itemsText}
             🛒 Carrito
           </h2>
 
-          {/* ✅ 4.2: Carrito con botones ➖ ➕ ✖ */}
+          {/* ✅ ✅ NUEVO: Banner bonito */}
+          {successMsg && (
+            <div
+              style={{
+                background: "#d1fae5",
+                color: "#065f46",
+                padding: "10px",
+                borderRadius: 10,
+                fontSize: 14,
+                marginBottom: 12,
+                border: "1px solid #10b981",
+              }}
+            >
+              {successMsg}
+            </div>
+          )}
+
           {cart.length === 0 ? (
             <p style={{ marginTop: 12, color: "#666" }}>
               Aún no agregaste productos.
