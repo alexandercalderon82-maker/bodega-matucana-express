@@ -159,6 +159,88 @@ ${itemsText}
     window.open(url, "_blank");
   };
 
+  // ✅ NUEVO: IMPRIMIR TICKET / PDF
+  const printTicket = () => {
+    if (!selectedOrder) return;
+
+    const itemsText =
+      items.length === 0
+        ? "<p>(Sin productos)</p>"
+        : items
+            .map(
+              (it) => `
+              <tr>
+                <td style="padding: 6px 0;">${it.name_snapshot} x${it.quantity}</td>
+                <td style="text-align:right; padding: 6px 0;">
+                  S/ ${(Number(it.price_snapshot) * it.quantity).toFixed(2)}
+                </td>
+              </tr>
+            `
+            )
+            .join("");
+
+    const dateText = new Date(selectedOrder.created_at).toLocaleString();
+
+    const html = `
+  <html>
+    <head>
+      <title>Ticket Pedido</title>
+    </head>
+    <body style="font-family: Arial; padding: 20px; max-width: 380px;">
+      <h2 style="text-align:center; margin:0;">Bodega Matucana Express</h2>
+      <p style="text-align:center; margin:4px 0 12px 0; font-size: 13px;">
+        Jr. Tacna - Matucana<br/>
+        7:00 a.m. a 10:00 p.m.
+      </p>
+
+      <hr/>
+
+      <p style="margin:6px 0;"><b>Fecha:</b> ${dateText}</p>
+      <p style="margin:6px 0;"><b>Cliente:</b> ${selectedOrder.customer_name}</p>
+      <p style="margin:6px 0;"><b>Celular:</b> ${selectedOrder.phone}</p>
+      <p style="margin:6px 0;"><b>Tipo:</b> ${
+        selectedOrder.delivery_type === "delivery" ? "Delivery" : "Recojo"
+      }</p>
+      ${
+        selectedOrder.delivery_type === "delivery"
+          ? `<p style="margin:6px 0;"><b>Dirección:</b> ${selectedOrder.address || "-"}</p>`
+          : ""
+      }
+      <p style="margin:6px 0;"><b>Nota:</b> ${selectedOrder.note || "Sin nota"}</p>
+
+      <hr/>
+
+      <h3 style="margin:10px 0;">Productos</h3>
+
+      <table style="width:100%; font-size:14px;">
+        ${itemsText}
+      </table>
+
+      <hr/>
+
+      <p style="margin:6px 0;"><b>Subtotal:</b> S/ ${Number(selectedOrder.subtotal).toFixed(2)}</p>
+      <p style="margin:6px 0;"><b>Delivery:</b> S/ ${Number(selectedOrder.delivery_fee).toFixed(2)}</p>
+      <p style="margin:10px 0; font-size:18px;"><b>Total:</b> S/ ${Number(selectedOrder.total).toFixed(2)}</p>
+
+      <hr/>
+
+      <p style="text-align:center; font-size:12px; color:#666;">
+        ¡Gracias por tu compra! 🙌
+      </p>
+
+      <script>
+        window.print();
+      </script>
+    </body>
+  </html>
+  `;
+
+    const w = window.open("", "_blank");
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
   useEffect(() => {
     loadOrders();
   }, []);
@@ -396,6 +478,24 @@ ${itemsText}
                     }}
                   >
                     📩 Enviar pedido al cliente
+                  </button>
+
+                  {/* ✅ NUEVO: IMPRIMIR */}
+                  <button
+                    onClick={printTicket}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      background: "#6f42c1",
+                      color: "white",
+                      fontWeight: "bold",
+                      marginTop: 10,
+                    }}
+                  >
+                    🧾 Imprimir ticket / PDF
                   </button>
 
                   <p style={{ marginTop: 12 }}>
