@@ -178,8 +178,14 @@ export default function AdminOrders() {
                     borderRadius: 10,
                     marginBottom: 12,
                     cursor: "pointer",
+
+                    // ✅ CAMBIO: entregados en verde
                     background:
-                      selectedOrder?.id === o.id ? "#f0f0f0" : o.status === "delivered" ? "#e6ffed" // ✅ verde suave : "white" ,
+                      selectedOrder?.id === o.id
+                        ? "#f0f0f0"
+                        : o.status === "delivered"
+                        ? "#e6ffed"
+                        : "white",
                   }}
                 >
                   <p style={{ margin: 0, fontWeight: "bold" }}>
