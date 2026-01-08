@@ -179,7 +179,7 @@ export default function AdminOrders() {
                     marginBottom: 12,
                     cursor: "pointer",
                     background:
-                      selectedOrder?.id === o.id ? "#f9f9f9" : "white",
+                      selectedOrder?.id === o.id ? "#f0f0f0" : o.status === "delivered" ? "#e6ffed" // ✅ verde suave : "white" ,
                   }}
                 >
                   <p style={{ margin: 0, fontWeight: "bold" }}>

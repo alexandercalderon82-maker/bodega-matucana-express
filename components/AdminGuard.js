@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const ADMIN_PASS = process.env.NEXT_PUBLIC_ADMIN_PASS || "admin123";
+const ADMIN_PASS = process.env.NEXT_PUBLIC_ADMIN_PASS || "Rcalderon08@";
 const STORAGE_KEY = "admin_authed";
 
 export default function AdminGuard({ children }) {
