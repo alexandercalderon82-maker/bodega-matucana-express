@@ -361,7 +361,7 @@ ${itemsText}
                   }}
                 >
                   <p style={{ margin: 0, fontWeight: "bold" }}>
-                    👤 {o.customer_name} — 📱 {o.phone}
+                    🎫 Ticket #{String(o.ticket_number || "").padStart(4, "0")} — 👤 {o.customer_name} — 📱 {o.phone}
                   </p>
                   <p style={{ margin: 0, color: "#555" }}>
                     💰 Total: S/ {Number(o.total).toFixed(2)}
@@ -411,7 +411,7 @@ ${itemsText}
               ) : (
                 <>
                   <h2 style={{ marginTop: 0 }}>🧾 Detalle</h2>
-
+                🎫 Ticket #{String(o.ticket_number || "").padStart(4, "0")} — 👤 {o.customer_name} — 📱 {o.phone}
                   <p>
                     <b>Cliente:</b> {selectedOrder.customer_name}
                   </p>
