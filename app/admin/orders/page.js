@@ -295,6 +295,29 @@ export default function AdminOrders() {
                   <div style={{ display: "flex", gap: 10 }}>
                     <button
                       onClick={() => updateStatus(selectedOrder.id, "pending")}
+                      <button
+  onClick={() => {
+    const phone = (selectedOrder.phone || "").replace(/\D/g, "");
+    if (!phone) {
+      alert("No hay celular válido.");
+      return;
+    }
+    window.open(`https://wa.me/51${phone}`, "_blank");
+  }}
+  style={{
+    width: "100%",
+    padding: "10px",
+    borderRadius: 10,
+    border: "none",
+    cursor: "pointer",
+    background: "#25D366",
+    color: "white",
+    fontWeight: "bold",
+    marginTop: 10,
+  }}
+>
+  💬 Abrir WhatsApp del cliente
+</button>
                       style={{
                         flex: 1,
                         padding: "10px",
