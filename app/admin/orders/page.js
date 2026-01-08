@@ -241,7 +241,32 @@ export default function AdminOrders() {
                     <b>Celular:</b> {selectedOrder.phone}
                   </p>
 
-                  <p>
+                  {/* ✅ NUEVO: BOTÓN WHATSAPP */}
+                  <button
+                    onClick={() => {
+                      const phone = (selectedOrder.phone || "").replace(/\D/g, "");
+                      if (!phone) {
+                        alert("No hay celular válido.");
+                        return;
+                      }
+                      window.open(`https://wa.me/51${phone}`, "_blank");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      background: "#25D366",
+                      color: "white",
+                      fontWeight: "bold",
+                      marginTop: 10,
+                    }}
+                  >
+                    💬 Abrir WhatsApp del cliente
+                  </button>
+
+                  <p style={{ marginTop: 12 }}>
                     <b>Tipo:</b>{" "}
                     {selectedOrder.delivery_type === "delivery"
                       ? "🚚 Delivery"
