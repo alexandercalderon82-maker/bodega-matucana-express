@@ -68,6 +68,50 @@ export default function AdminOrders() {
     }
   };
 
+  // ✅ NUEVO: COPIAR PEDIDO
+  const copyOrderToClipboard = async () => {
+    if (!selectedOrder) return;
+
+    const itemsText =
+      items.length === 0
+        ? "(Sin productos)"
+        : items
+            .map(
+              (it) =>
+                `• ${it.name_snapshot} x${it.quantity} — S/ ${(Number(it.price_snapshot) * it.quantity).toFixed(2)}`
+            )
+            .join("\n");
+
+    const msg = `
+📋 PEDIDO - Bodega Matucana Express
+
+👤 Nombre: ${selectedOrder.customer_name}
+📱 Celular: ${selectedOrder.phone}
+
+🚚 Tipo: ${
+      selectedOrder.delivery_type === "delivery" ? "Delivery" : "Recojo"
+    }
+📍 Dirección: ${selectedOrder.address || "-"}
+
+🛒 Productos:
+${itemsText}
+
+📝 Subtotal: S/ ${Number(selectedOrder.subtotal).toFixed(2)}
+🚚 Delivery: S/ ${Number(selectedOrder.delivery_fee).toFixed(2)}
+💰 Total: S/ ${Number(selectedOrder.total).toFixed(2)}
+
+🗒️ Nota: ${selectedOrder.note || "Sin nota"}
+`.trim();
+
+    try {
+      await navigator.clipboard.writeText(msg);
+      alert("✅ Pedido copiado. Pégalo en WhatsApp.");
+    } catch (err) {
+      console.error("Error copiando:", err);
+      alert("❌ No se pudo copiar. Revisa permisos del navegador.");
+    }
+  };
+
   useEffect(() => {
     loadOrders();
   }, []);
@@ -247,7 +291,7 @@ export default function AdminOrders() {
                     <b>Celular:</b> {selectedOrder.phone}
                   </p>
 
-                  {/* ✅ NUEVO: BOTÓN WHATSAPP */}
+                  {/* ✅ BOTÓN WHATSAPP */}
                   <button
                     onClick={() => {
                       const phone = (selectedOrder.phone || "").replace(/\D/g, "");
@@ -270,6 +314,24 @@ export default function AdminOrders() {
                     }}
                   >
                     💬 Abrir WhatsApp del cliente
+                  </button>
+
+                  {/* ✅ NUEVO: BOTÓN COPIAR PEDIDO */}
+                  <button
+                    onClick={copyOrderToClipboard}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      background: "#007bff",
+                      color: "white",
+                      fontWeight: "bold",
+                      marginTop: 10,
+                    }}
+                  >
+                    📋 Copiar pedido
                   </button>
 
                   <p style={{ marginTop: 12 }}>
