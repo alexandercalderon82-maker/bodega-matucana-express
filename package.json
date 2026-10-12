@@ -8,13 +8,15 @@
     "start": "next start",
     "lint": "eslint",
     "preview": "node scripts/generate-preview.mjs",
-    "test:permissions": "node tests/supabase-permissions.mjs"
+    "test:permissions": "node tests/supabase-permissions.mjs",
+    "test:orders": "node tests/orders-permissions.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
     "next": "16.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
