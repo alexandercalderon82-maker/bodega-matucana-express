@@ -1,543 +1,99 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useState } from 'react';
+import { store } from './products';
+import Brand from '@/components/Brand';
+import Icon from '@/components/Icons';
+import ProductImage from '@/components/ProductImage';
+import AdminAccess from '@/components/AdminAccess';
+import { useCatalog, usesSharedCatalog } from '@/lib/catalog';
 
-const DELIVERY_FEE = 5;
-const STORE_NAME = "Bodega Matucana Express";
-const STORE_ADDRESS = "Jr. Tacna - Matucana";
-const STORE_HOURS = "7:00 a.m. a 10:00 p.m.";
+const money = value => `S/ ${value.toFixed(2)}`;
 
 export default function Home() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const shared = usesSharedCatalog();
+  const { products: catalog, categories: catalogCategories, error, loading } = useCatalog();
+  const products = catalog.filter(p => p.active);
+  const categories = ['Todo', ...catalogCategories];
+  const [view, setView] = useState('store');
+  const [category, setCategory] = useState('Todo');
+  const [search, setSearch] = useState('');
+  const [cart, setCart] = useState({});
+  const [delivery, setDelivery] = useState('pickup');
+  const [sent, setSent] = useState(false);
+  const items = products.filter(p => cart[p.id]).map(p => ({ ...p, qty: cart[p.id] }));
+  const count = items.reduce((sum, p) => sum + p.qty, 0);
+  const subtotal = items.reduce((sum, p) => sum + p.price * p.qty, 0);
+  const fee = delivery === 'delivery' && count ? store.deliveryFee : 0;
+  const visible = products.filter(p => (category === 'Todo' || p.category === category) && p.name.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
 
-  const [cart, setCart] = useState([]); // [{id, name, price, qty}]
-  const [customerName, setCustomerName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [deliveryType, setDeliveryType] = useState("delivery"); // delivery | pickup
-  const [address, setAddress] = useState("");
-  const [note, setNote] = useState("");
+  function change(id, delta) {
+    setCart(previous => ({ ...previous, [id]: Math.max(0, (previous[id] || 0) + delta) }));
+    setSent(false);
+  }
 
-  // ✅ ✅ NUEVO: mensaje de éxito (reemplaza el alert final)
-  const [successMsg, setSuccessMsg] = useState("");
+  function order(event) {
+    event.preventDefault();
+    if (!count) return;
+    const data = new FormData(event.currentTarget);
+    const name = String(data.get('name') || '').trim();
+    const phone = String(data.get('phone') || '').trim();
+    const address = String(data.get('address') || '').trim();
+    if (!name || !phone || (delivery === 'delivery' && !address)) return;
+    const message = [
+      `Hola, ${store.name}. Quisiera consultar este pedido:`,
+      shared ? 'Por favor confirmar disponibilidad y entrega.' : 'Catálogo de ejemplo: por favor confirmar productos, precios y disponibilidad.',
+      '', `Nombre: ${name}`, `Celular: ${phone}`,
+      delivery === 'delivery' ? `Delivery a: ${address}` : 'Recojo en tienda', '',
+      ...items.map(p => `• ${p.name} (${p.unit}) × ${p.qty}: ${money(p.price * p.qty)}`),
+      '', `Subtotal referencial: ${money(subtotal)}`, `Delivery referencial: ${money(fee)}`, `Total referencial: ${money(subtotal + fee)}`,
+      `Nota: ${String(data.get('note') || '').trim() || 'Sin nota'}`,
+    ].join('\n');
+    window.open(`https://wa.me/${store.whatsapp}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    setSent(true);
+  }
 
-  // ✅ Cargar productos
-  const loadProducts = async () => {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("products")
-      .select("id,name,price,category,image_url,is_active")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("ERROR SUPABASE:", error.message);
-      setProducts([]);
-    } else {
-      setProducts(data || []);
-    }
-
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  // ✅ Agregar al carrito
-  const addToCart = (product) => {
-    setCart((prev) => {
-      const found = prev.find((p) => p.id === product.id);
-      if (found) {
-        return prev.map((p) =>
-          p.id === product.id ? { ...p, qty: p.qty + 1 } : p
-        );
-      }
-      return [...prev, { ...product, qty: 1 }];
-    });
-  };
-
-  // ✅ Quitar del carrito (eliminar completamente)
-  const removeFromCart = (id) => {
-    setCart((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  // ✅ 4.1: Aumentar cantidad
-  const increaseQty = (id) => {
-    setCart((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, qty: p.qty + 1 } : p))
-    );
-  };
-
-  // ✅ 4.1: Disminuir cantidad (si llega a 0, se elimina)
-  const decreaseQty = (id) => {
-    setCart((prev) =>
-      prev
-        .map((p) => (p.id === id ? { ...p, qty: p.qty - 1 } : p))
-        .filter((p) => p.qty > 0)
-    );
-  };
-
-  // ✅ Calcular totales
-  const subtotal = cart.reduce(
-    (sum, item) => sum + Number(item.price) * item.qty,
-    0
-  );
-
-  const deliveryFee = deliveryType === "delivery" ? DELIVERY_FEE : 0;
-  const total = subtotal + deliveryFee;
-
-  // ✅ Mensaje WhatsApp
-  const buildWhatsappMessage = () => {
-    const itemsText =
-      cart.length === 0
-        ? "• (Sin productos)"
-        : cart
-            .map(
-              (item) =>
-                `• ${item.name} x${item.qty} — S/ ${(
-                  Number(item.price) * item.qty
-                ).toFixed(2)}`
-            )
-            .join("\n");
-
-    const deliveryText =
-      deliveryType === "delivery"
-        ? `🚚 *Tipo:* Delivery\n📍 *Dirección:* ${address || "-"}`
-        : `🏪 *Tipo:* Recojo en tienda`;
-
-    const msg = `
-📋 *PEDIDO - ${STORE_NAME}*
-
-👤 *Nombre:* ${customerName || "-"}
-📱 *Celular:* ${phone || "-"}
-
-${deliveryText}
-
-🛒 *Productos:*
-${itemsText}
-
-📝 *Subtotal:* S/ ${subtotal.toFixed(2)}
-🚚 *Delivery:* S/ ${deliveryFee.toFixed(2)}
-💰 *Total:* S/ ${total.toFixed(2)}
-
-🗒️ *Nota:* ${note || "Sin nota"}
-
-📍 *Ubicación:* ${STORE_ADDRESS}
-🕜 *Horario:* ${STORE_HOURS}
-`.trim();
-
-    return msg;
-  };
-
-  const sendWhatsapp = async () => {
-    if (!customerName.trim() || !phone.trim()) {
-      alert("Completa tu nombre y celular.");
-      return;
-    }
-
-    if (deliveryType === "delivery" && !address.trim()) {
-      alert("Ingresa tu dirección para delivery.");
-      return;
-    }
-
-    if (cart.length === 0) {
-      alert("Agrega al menos 1 producto.");
-      return;
-    }
-
-    try {
-      // ✅ 1) Guardar pedido en tabla orders
-      const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .insert([
-          {
-            customer_name: customerName,
-            phone: phone,
-            delivery_type: deliveryType,
-            address: deliveryType === "delivery" ? address : null,
-            note: note,
-            subtotal: subtotal,
-            delivery_fee: deliveryFee,
-            total: total,
-          },
-        ])
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error("Error guardando order:", orderError.message);
-        alert("❌ Error guardando el pedido en Supabase.");
-        return;
-      }
-
-      // ✅ 2) Guardar productos en tabla order_items
-      const itemsToInsert = cart.map((item) => ({
-        order_id: orderData.id,
-        product_id: item.id,
-        name_snapshot: item.name,
-        price_snapshot: Number(item.price),
-        quantity: item.qty,
-        subtotal: Number(item.price) * item.qty,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(itemsToInsert);
-
-      if (itemsError) {
-        console.error("Error guardando items:", itemsError.message);
-        alert("❌ Error guardando productos del pedido.");
-        return;
-      }
-
-      // ✅ 3) Abrir WhatsApp
-      const message = buildWhatsappMessage();
-      const encoded = encodeURIComponent(message);
-
-      const whatsappURL = `https://wa.me/51908953959?text=${encoded}`;
-      window.open(whatsappURL, "_blank");
-
-      // ✅ 4) Limpiar carrito y campos
-      setCart([]);
-      setCustomerName("");
-      setPhone("");
-      setAddress("");
-      setNote("");
-
-      // ✅ ✅ NUEVO: Mensaje bonito dentro del carrito
-      setSuccessMsg("✅ Pedido guardado en Supabase y WhatsApp listo para enviar.");
-      setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err) {
-      console.error("Error general:", err);
-      alert("❌ Ocurrió un error inesperado.");
-    }
-  };
+  if (view === 'admin') return <AdminAccess onStore={() => setView('store')}/>;
 
   return (
-    <main style={{ padding: 20, fontFamily: "Arial" }}>
-      <h1 style={{ fontSize: 28, fontWeight: "bold" }}>{STORE_NAME}</h1>
-      <p style={{ marginTop: 4, color: "#555" }}>
-        {STORE_ADDRESS} • {STORE_HOURS}
-      </p>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) minmax(320px, 1fr)",
-          gap: 20,
-          marginTop: 20,
-          alignItems: "start",
-        }}
-      >
-        {/* ✅ Productos */}
-        <section>
-          <h2 style={{ fontSize: 22, fontWeight: "bold" }}>Productos</h2>
-
-          {loading ? (
-            <p style={{ marginTop: 20 }}>Cargando productos...</p>
-          ) : products.length === 0 ? (
-            <p style={{ marginTop: 20 }}>No hay productos disponibles.</p>
-          ) : (
-            <div
-              style={{
-                marginTop: 20,
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 16,
-              }}
-            >
-              {products.map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    border: "1px solid #ddd",
-                    borderRadius: 12,
-                    padding: 12,
-                    background: "#fff",
-                  }}
-                >
-                  {p.image_url ? (
-                    <img
-                      src={p.image_url}
-                      alt={p.name}
-                      style={{
-                        width: "100%",
-                        height: 130,
-                        objectFit: "cover",
-                        borderRadius: 10,
-                        marginBottom: 10,
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: 130,
-                        background: "#f2f2f2",
-                        borderRadius: 10,
-                        marginBottom: 10,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#777",
-                        fontSize: 12,
-                      }}
-                    >
-                      Sin imagen
-                    </div>
-                  )}
-
-                  <p style={{ fontWeight: "bold", marginBottom: 4 }}>{p.name}</p>
-                  <p style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>
-                    {p.category || "Sin categoría"}
-                  </p>
-                  <p style={{ fontWeight: "bold" }}>
-                    S/ {Number(p.price).toFixed(2)}
-                  </p>
-
-                  <button
-                    onClick={() => addToCart(p)}
-                    style={{
-                      background: "black",
-                      color: "white",
-                      padding: "10px",
-                      width: "100%",
-                      marginTop: "10px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      border: "none",
-                    }}
-                  >
-                    + Agregar
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+    <>
+      <div className="topbar"><span>De Matucana, para ti.</span><span>Atendemos de {store.hours}</span><span>Pedidos por WhatsApp <Icon name="arrow" size={12}/></span></div>
+      <header className="header wrap">
+        <Brand onClick={e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/><nav className="header-nav"><a href="#catalogo">Catálogo</a><a href="#como-comprar">Cómo comprar</a><button onClick={() => setView('admin')}>Administración</button></nav>
+        <a className="cart-link" href="#pedido"><Icon name="bag" size={18}/> Mi pedido <span>{count}</span></a>
+      </header>
+      <main className="wrap">
+        <section className="hero">
+          <div className="hero-copy"><span className="hero-pill"><span/> EL MERCADO DE TU BARRIO</span><h1>Tu día empieza<br/>con algo <em>bueno.</em></h1><p>Los básicos de siempre, tus antojos de hoy y una forma más fácil de comprar. Todo, cerquita de casa.</p><div className="hero-actions"><a className="primary" href="#catalogo">Encuentra tus favoritos <Icon name="arrow" size={18}/></a><span>Elige. Pide.<br/><strong>Disfruta.</strong></span></div><div className="hero-meta"><Icon name="pin" size={16}/> {store.address}</div></div>
+          <div className="hero-scene" aria-label="Ilustración de productos de ejemplo de MatuMarket"><div className="scene-orbit"/><div className="scene-caption">EL SABOR DE<br/><strong>estar cerca.</strong></div><div className="scene-label">LO BUENO<br/>ESTÁ AQUÍ <span><Icon name="arrow" size={32}/></span></div><div className="scene-products"><ProductImage src="/products/leche.svg" name="Leche de ejemplo" className="scene-milk"/><ProductImage src="/products/arroz.svg" name="Arroz de ejemplo" className="scene-rice"/><ProductImage src="/products/aceite.svg" name="Aceite de ejemplo" className="scene-oil"/></div><div className="scene-badge"><Icon name="leaf" size={19}/><span>Tu compra<br/><strong>sin complicaciones</strong></span></div><div className="scene-spark"><svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><g stroke="currentColor" strokeWidth="7" strokeLinecap="round"><path d="M32 7v50M7 32h50M14 14l36 36M14 50l36-36"/></g></svg></div></div>
         </section>
-
-        {/* ✅ Carrito */}
-        <aside
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 12,
-            padding: 12,
-            background: "#fff",
-            position: "sticky",
-            top: 20,
-            height: "fit-content",
-          }}
-        >
-          <h2 style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10 }}>
-            🛒 Carrito
-          </h2>
-
-          {/* ✅ ✅ NUEVO: Banner bonito */}
-          {successMsg && (
-            <div
-              style={{
-                background: "#d1fae5",
-                color: "#065f46",
-                padding: "10px",
-                borderRadius: 10,
-                fontSize: 14,
-                marginBottom: 12,
-                border: "1px solid #10b981",
-              }}
-            >
-              {successMsg}
-            </div>
-          )}
-
-          {cart.length === 0 ? (
-            <p style={{ marginTop: 12, color: "#666" }}>
-              Aún no agregaste productos.
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {cart.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    borderBottom: "1px solid #eee",
-                    paddingBottom: 8,
-                  }}
-                >
-                  <div>
-                    <p style={{ fontWeight: "bold", margin: 0 }}>{item.name}</p>
-                    <p style={{ margin: 0, fontSize: 13, color: "#666" }}>
-                      S/ {Number(item.price).toFixed(2)} x {item.qty}
-                    </p>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button
-                      onClick={() => decreaseQty(item.id)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 6,
-                        border: "1px solid #ccc",
-                        cursor: "pointer",
-                        background: "#fff",
-                      }}
-                    >
-                      ➖
-                    </button>
-
-                    <span
-                      style={{
-                        fontWeight: "bold",
-                        minWidth: 18,
-                        textAlign: "center",
-                      }}
-                    >
-                      {item.qty}
-                    </span>
-
-                    <button
-                      onClick={() => increaseQty(item.id)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 6,
-                        border: "1px solid #ccc",
-                        cursor: "pointer",
-                        background: "#fff",
-                      }}
-                    >
-                      ➕
-                    </button>
-
-                    <button
-                      onClick={() => removeFromCart(item.id)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 6,
-                        border: "none",
-                        cursor: "pointer",
-                        background: "red",
-                        color: "white",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      ✖
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <hr style={{ margin: "16px 0" }} />
-
-          <p>
-            <b>Subtotal:</b> S/ {subtotal.toFixed(2)}
-          </p>
-          <p>
-            <b>Delivery:</b> S/ {deliveryFee.toFixed(2)}
-          </p>
-          <p style={{ fontSize: 18 }}>
-            <b>Total:</b> S/ {total.toFixed(2)}
-          </p>
-
-          <hr style={{ margin: "16px 0" }} />
-
-          <input
-            placeholder="Tu nombre"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              marginBottom: 10,
-            }}
-          />
-
-          <input
-            placeholder="Tu celular"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              marginBottom: 10,
-            }}
-          />
-
-          <select
-            value={deliveryType}
-            onChange={(e) => setDeliveryType(e.target.value)}
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              marginBottom: 10,
-            }}
-          >
-            <option value="delivery">Delivery</option>
-            <option value="pickup">Recojo en tienda</option>
-          </select>
-
-          {deliveryType === "delivery" && (
-            <input
-              placeholder="Dirección"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 10,
-                borderRadius: 8,
-                border: "1px solid #ddd",
-                marginBottom: 10,
-              }}
-            />
-          )}
-
-          <textarea
-            placeholder="Nota (opcional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              marginBottom: 10,
-              minHeight: 60,
-            }}
-          />
-
-          <button
-            onClick={sendWhatsapp}
-            style={{
-              width: "100%",
-              padding: 12,
-              borderRadius: 10,
-              border: "none",
-              cursor: "pointer",
-              background: "#25D366",
-              color: "white",
-              fontWeight: "bold",
-              fontSize: 16,
-            }}
-          >
-            Enviar pedido por WhatsApp
-          </button>
-        </aside>
-      </div>
-    </main>
+        <div className="benefits" id="como-comprar"><div><span><Icon name="bag" size={24}/></span><p><strong>Elige a tu gusto</strong><small>Explora y arma tu carrito</small></p></div><div><span><Icon name="arrow" size={24}/></span><p><strong>Pídelo por WhatsApp</strong><small>Coordinamos contigo directamente</small></p></div><div><span><Icon name="truck" size={24}/></span><p><strong>Recoge o recibe</strong><small>Elige lo que mejor te acomode</small></p></div></div>
+        <div className="notice">{shared ? <><strong>Compra a tu manera.</strong> Arma tu pedido y confirma disponibilidad y entrega por WhatsApp.</> : <><strong>Versión de prueba.</strong> Productos, ilustraciones y precios de ejemplo. Confirma disponibilidad y total con la tienda.</>}</div>
+        {error && <p className="error" role="alert">{error}</p>}
+        {loading && <p role="status">Cargando catálogo…</p>}
+        <div className="shop-layout">
+          <section id="catalogo" className="catalog">
+            <div className="section-heading"><div><span className="eyebrow">TU DESPENSA, CON UN CLIC</span><h2>Encuentra tus favoritos</h2></div><span>{visible.length} productos</span></div>
+            <label className="search"><Icon name="search"/><span className="sr-only">Buscar productos</span><input type="search" placeholder="¿Qué necesitas hoy?" value={search} onChange={e => setSearch(e.target.value)} /></label>
+            <div className="categories" aria-label="Categorías">{categories.map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => setCategory(c)}>{c}</button>)}</div>
+            <div className="products">{visible.map(p => <article className="product" key={p.id}><div className="product-art"><span className="product-category-tag">{p.category}</span><ProductImage key={p.image} src={p.image} name={p.name}/></div><div className="product-content"><small>{p.category}</small><h3>{p.name}</h3><p>{p.unit}</p><div className="product-bottom"><strong>{money(p.price)}</strong><button className="add" aria-label={`Agregar ${p.name}`} onClick={() => change(p.id, 1)}><Icon name="plus" size={18}/></button></div></div></article>)}</div>
+            {!visible.length && <p className="empty">No encontramos productos. Prueba otra búsqueda o categoría.</p>}
+          </section>
+          <aside className="order" id="pedido"><div className="section-heading"><h2>Tu bolsa</h2><span className="count-badge">{count}</span></div><p className="muted">Tus favoritos están a un mensaje de distancia.</p>
+            {!count ? <div className="empty"><div className="empty-bag"><Icon name="bag" size={32}/></div><p>Tu carrito está esperando.<br />Agrega tus productos favoritos.</p></div> : <ul className="cart-items">{items.map(p => <li key={p.id}><div><strong>{p.name}</strong><small>{money(p.price * p.qty)}</small></div><div className="quantity"><button aria-label={`Quitar una unidad de ${p.name}`} onClick={() => change(p.id, -1)}>−</button><span>{p.qty}</span><button aria-label={`Agregar una unidad de ${p.name}`} onClick={() => change(p.id, 1)}><Icon name="plus" size={18}/></button></div></li>)}</ul>}
+            <form onSubmit={order}><fieldset><legend>¿Cómo lo recibes?</legend><label><input type="radio" name="deliveryType" value="pickup" checked={delivery === 'pickup'} onChange={() => setDelivery('pickup')} /> Recojo en tienda</label><label><input type="radio" name="deliveryType" value="delivery" checked={delivery === 'delivery'} onChange={() => setDelivery('delivery')} /> Delivery · {money(store.deliveryFee)}</label></fieldset>
+              <label className="field">Tu nombre<input name="name" autoComplete="name" required maxLength={100} placeholder="¿Cómo te llamas?" /></label>
+              <label className="field">Celular<input name="phone" type="tel" autoComplete="tel" required pattern="[+0-9 ()-]{6,20}" maxLength={20} placeholder="Tu número de contacto" /></label>
+              {delivery === 'delivery' && <label className="field">Dirección<input name="address" autoComplete="street-address" required maxLength={200} placeholder="Calle, número y referencia" /></label>}
+              <label className="field">Nota <span>(opcional)</span><textarea name="note" maxLength={500} placeholder="¿Algo que debamos saber?" rows={2} /></label>
+              <div className="totals"><div><span>Subtotal</span><span>{money(subtotal)}</span></div><div><span>Delivery</span><span>{money(fee)}</span></div><div className="total"><strong>Total referencial</strong><strong>{money(subtotal + fee)}</strong></div></div>
+              <button className="primary checkout" disabled={!count} type="submit">Pedir por WhatsApp <Icon name="arrow" size={17}/></button><p className="fine-print">Se abrirá WhatsApp con tu pedido. Revísalo y envíalo para coordinar; la tienda debe confirmar tu compra.</p>
+              {sent && <p role="status" className="status">Si WhatsApp no se abrió, permite las ventanas emergentes y vuelve a intentar. Tu pedido sigue en el carrito.</p>}
+            </form>
+          </aside>
+        </div>
+      </main>
+      <footer><div className="wrap footer-inner"><div><Brand dark/><p>Tu compra cerca de casa.<br/>Hecho para el día a día en Matucana.</p></div><div><strong>Visítanos</strong><p>{store.address}<br/>{store.hours}</p></div><div><strong>¿Algo que necesites?</strong><a href={`https://wa.me/${store.whatsapp}`} target="_blank" rel="noopener noreferrer">Hablemos por WhatsApp <Icon name="arrow" size={14}/></a><button onClick={() => setView('admin')}>Panel de administración</button></div></div><div className="wrap footer-bottom">MatuMarket · Compramos en nuestro barrio.<span>{shared ? 'Tu compra cerca de casa' : 'Versión de prueba'}</span></div></footer>
+    </>
   );
 }
