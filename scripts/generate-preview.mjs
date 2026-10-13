@@ -10,7 +10,7 @@ const result = await build({
   stdin: { contents: "import React from 'react'; import {createRoot} from 'react-dom/client'; import Home from './app/page.js'; createRoot(document.getElementById('root')).render(<Home/>);", resolveDir: root, loader: 'jsx' },
   bundle: true, minify: true, write: false, jsx: 'automatic', loader: { '.js': 'jsx' },
   alias: { '@': root, react, 'react-dom': resolve(root, 'node_modules/react-dom') },
-  define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_SUPABASE_URL': '""', 'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': '""', 'process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY': '""' },
+  define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_SUPABASE_URL': '""', 'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': '""' },
   plugins: [{ name: 'portable-links', setup(builder) {
     builder.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'preview' }));
     builder.onLoad({ filter: /.*/, namespace: 'preview' }, () => ({ contents: `import React from ${JSON.stringify(resolve(react, 'index.js'))}; export default function Link({children,...props}) { return React.createElement('a',props,children); }`, resolveDir: root }));

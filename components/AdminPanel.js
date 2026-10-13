@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Brand from './Brand';
 import Icon from './Icons';
-import OrdersPanel from './OrdersPanel';
-import PushSettings from './PushSettings';
 import ProductImage from './ProductImage';
 import { useCatalog, saveCatalog, imageFromFile, validateProduct, validateCatalog, addCategory, saveProduct, usesSharedCatalog } from '@/lib/catalog';
 
@@ -13,7 +11,6 @@ const blank = { id: '', name: '', category: 'Abarrotes', unit: '', price: '', im
 
 export default function AdminPanel({ onStore, demo = false, onLogout }) {
   const { products, categories, loading, error: catalogError } = useCatalog();
-  const [section, setSection] = useState(()=>typeof window!=='undefined'&&new URL(window.location.href).searchParams.has('order')?'orders':'products');
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(blank);
   const [message, setMessage] = useState('');
@@ -92,7 +89,7 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
 
   return <div className="admin-shell">
     <header className="header wrap"><Brand onClick={onStore ? e => { e.preventDefault(); onStore(); } : undefined}/><div className="admin-header-actions">{onLogout && <button className="outline-button" onClick={onLogout}><Icon name="logout" size={16}/>{demo ? 'Salir de la demo' : 'Cerrar sesión'}</button>}<Link className="outline-button" href="/" onClick={onStore ? e => { e.preventDefault(); onStore(); } : undefined}>Ver tienda <Icon name="arrow" size={16}/></Link></div></header>
-    <main className="wrap admin-main"><div className="admin-sections"><button aria-pressed={section==='products'} onClick={()=>setSection('products')}>Productos y categorías</button><button aria-pressed={section==='orders'} onClick={()=>setSection('orders')}>Pedidos</button><button aria-pressed={section==='notifications'} onClick={()=>setSection('notifications')}>Notificaciones</button></div>{section==='orders'?<OrdersPanel demo={demo}/>:section==='notifications'?<PushSettings demo={demo}/>:<>
+    <main className="wrap admin-main">
       <div className="admin-title"><div><span className="eyebrow">TU NEGOCIO, A TU MANERA</span><h1>Control de productos</h1><p>Actualiza tu catálogo en unos pocos pasos.</p></div><div className="admin-title-actions"><button className="outline-button" disabled={busy || loading} onClick={openCategory}><Icon name="plus" size={18}/> Nueva categoría</button><button className="primary" disabled={busy || loading || !categories.length} title={!categories.length ? 'Crea una categoría primero' : undefined} onClick={() => open()}><Icon name="plus" size={18}/> Nuevo producto</button></div></div>
       <div className={demo ? "demo-banner" : "connection-banner"}><Icon name="settings"/><div><strong>{demo ? 'Panel de demostración local' : 'Administración con acceso autorizado'}</strong><p>{demo ? 'Los cambios se guardan solo en este navegador. El acceso real requiere la web conectada a Supabase.' : 'Los cambios se guardan en Supabase y se comparten con los clientes de la tienda.'}</p></div></div>
       <div className="admin-stats"><div><span>Productos</span><strong>{products.length}</strong></div><div><span>Visibles en tienda</span><strong>{products.filter(p => p.active).length}</strong></div><div><span>Categorías</span><strong>{categories.length}</strong></div></div>
@@ -115,7 +112,7 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
         {error && <p className="error" role="alert">{error}</p>}
         <div className="editor-actions"><button type="button" className="outline-button" onClick={() => setEditing(null)} disabled={busy}>Cancelar</button><button className="primary" disabled={busy} type="submit">Guardar cambios <Icon name="check" size={16}/></button></div>
       </form>}</section></div>}
-      <p className="admin-footnote">{demo ? 'Consejo: exporta una copia. Borrar los datos del navegador elimina los cambios de esta demo.' : 'Exporta una copia del catálogo cuando necesites un respaldo adicional.'}</p></>}
+      <p className="admin-footnote">{demo ? 'Consejo: exporta una copia. Borrar los datos del navegador elimina los cambios de esta demo.' : 'Exporta una copia del catálogo cuando necesites un respaldo adicional.'}</p>
     </main>
   </div>;
 }

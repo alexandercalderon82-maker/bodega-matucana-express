@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { store } from './products';
-import { isPortablePreview } from '@/lib/supabase';
-import { saveDemoOrder } from '@/lib/orders';
 import Brand from '@/components/Brand';
 import Icon from '@/components/Icons';
 import ProductImage from '@/components/ProductImage';
@@ -23,12 +21,6 @@ export default function Home() {
   const [cart, setCart] = useState({});
   const [delivery, setDelivery] = useState('pickup');
   const [sent, setSent] = useState(false);
-  const [onlineOrders,setOnlineOrders]=useState(()=>isPortablePreview());
-  const [sending,setSending]=useState(false);
-  const [orderError,setOrderError]=useState('');
-  const [receipt,setReceipt]=useState(null);
-  const attempt=useRef(null);
-  useEffect(()=>{let alive=true;const check=()=>{if(!isPortablePreview()&&view==='store')fetch('/api/orders/status').then(r=>r.json()).then(data=>{if(alive)setOnlineOrders(Boolean(data.orders));}).catch(()=>{});};check();window.addEventListener('focus',check);return()=>{alive=false;window.removeEventListener('focus',check);};},[view]);
   const items = products.filter(p => cart[p.id]).map(p => ({ ...p, qty: cart[p.id] }));
   const count = items.reduce((sum, p) => sum + p.qty, 0);
   const subtotal = items.reduce((sum, p) => sum + p.price * p.qty, 0);
@@ -36,37 +28,18 @@ export default function Home() {
   const visible = products.filter(p => (category === 'Todo' || p.category === category) && p.name.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
 
   function change(id, delta) {
-    setCart(previous => ({ ...previous, [id]: Math.min(99,Math.max(0, (previous[id] || 0) + delta)) }));
-    setSent(false); setReceipt(null); setOrderError('');
+    setCart(previous => ({ ...previous, [id]: Math.max(0, (previous[id] || 0) + delta) }));
+    setSent(false);
   }
 
-  async function order(event) {
+  function order(event) {
     event.preventDefault();
-    if (!count || sending) return;
+    if (!count) return;
     const data = new FormData(event.currentTarget);
     const name = String(data.get('name') || '').trim();
     const phone = String(data.get('phone') || '').trim();
     const address = String(data.get('address') || '').trim();
     if (!name || !phone || (delivery === 'delivery' && !address)) return;
-    if(onlineOrders){
-      setSending(true);setOrderError('');
-      try{
-        const payload={name,phone,address,note:String(data.get('note')||'').trim(),delivery,items:items.map(p=>({id:p.id,quantity:p.qty}))};
-        const fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(payload))))).map(n=>n.toString(16).padStart(2,'0')).join('');
-        if(!attempt.current){try{attempt.current=JSON.parse(sessionStorage.getItem('matumarket-order-attempt')||'null');}catch{}}
-        if(attempt.current?.fingerprint!==fingerprint)attempt.current={fingerprint,id:crypto.randomUUID()};
-        try{sessionStorage.setItem('matumarket-order-attempt',JSON.stringify(attempt.current));}catch{}
-        let saved;
-        if(isPortablePreview())saved=saveDemoOrder({...payload,items:items.map(p=>({id:p.id,name:p.name,unit:p.unit,price:p.price,quantity:p.qty})),total:subtotal+fee},attempt.current.id);
-        else{
-          const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,requestId:attempt.current.id})});
-          const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo confirmar el pedido.');saved=result;
-        }
-        setReceipt(saved);setCart({});attempt.current=null;try{sessionStorage.removeItem('matumarket-order-attempt');}catch{}
-      }catch(e){setOrderError(e.message||'No se pudo confirmar. Reintenta con los mismos datos para evitar duplicados.');}
-      finally{setSending(false);}
-      return;
-    }
     const message = [
       `Hola, ${store.name}. Quisiera consultar este pedido:`,
       shared ? 'Por favor confirmar disponibilidad y entrega.' : 'Catálogo de ejemplo: por favor confirmar productos, precios y disponibilidad.',
@@ -84,7 +57,7 @@ export default function Home() {
 
   return (
     <>
-      <div className="topbar"><span>De Matucana, para ti.</span><span>Atendemos de {store.hours}</span><span>{onlineOrders?'Pedidos online':'Pedidos por WhatsApp'} <Icon name="arrow" size={12}/></span></div>
+      <div className="topbar"><span>De Matucana, para ti.</span><span>Atendemos de {store.hours}</span><span>Pedidos por WhatsApp <Icon name="arrow" size={12}/></span></div>
       <header className="header wrap">
         <Brand onClick={e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/><nav className="header-nav"><a href="#catalogo">Catálogo</a><a href="#como-comprar">Cómo comprar</a><button onClick={() => setView('admin')}>Administración</button></nav>
         <a className="cart-link" href="#pedido"><Icon name="bag" size={18}/> Mi pedido <span>{count}</span></a>
@@ -94,8 +67,8 @@ export default function Home() {
           <div className="hero-copy"><span className="hero-pill"><span/> EL MERCADO DE TU BARRIO</span><h1>Tu día empieza<br/>con algo <em>bueno.</em></h1><p>Los básicos de siempre, tus antojos de hoy y una forma más fácil de comprar. Todo, cerquita de casa.</p><div className="hero-actions"><a className="primary" href="#catalogo">Encuentra tus favoritos <Icon name="arrow" size={18}/></a><span>Elige. Pide.<br/><strong>Disfruta.</strong></span></div><div className="hero-meta"><Icon name="pin" size={16}/> {store.address}</div></div>
           <div className="hero-scene" aria-label="Ilustración de productos de ejemplo de MatuMarket"><div className="scene-orbit"/><div className="scene-caption">EL SABOR DE<br/><strong>estar cerca.</strong></div><div className="scene-label">LO BUENO<br/>ESTÁ AQUÍ <span><Icon name="arrow" size={32}/></span></div><div className="scene-products"><ProductImage src="/products/leche.svg" name="Leche de ejemplo" className="scene-milk"/><ProductImage src="/products/arroz.svg" name="Arroz de ejemplo" className="scene-rice"/><ProductImage src="/products/aceite.svg" name="Aceite de ejemplo" className="scene-oil"/></div><div className="scene-badge"><Icon name="leaf" size={19}/><span>Tu compra<br/><strong>sin complicaciones</strong></span></div><div className="scene-spark"><svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><g stroke="currentColor" strokeWidth="7" strokeLinecap="round"><path d="M32 7v50M7 32h50M14 14l36 36M14 50l36-36"/></g></svg></div></div>
         </section>
-        <div className="benefits" id="como-comprar"><div><span><Icon name="bag" size={24}/></span><p><strong>Elige a tu gusto</strong><small>Explora y arma tu carrito</small></p></div><div><span><Icon name="arrow" size={24}/></span><p><strong>{onlineOrders?'Confirma tu pedido':'Pídelo por WhatsApp'}</strong><small>Coordinamos contigo directamente</small></p></div><div><span><Icon name="truck" size={24}/></span><p><strong>Recoge o recibe</strong><small>Elige lo que mejor te acomode</small></p></div></div>
-        <div className="notice">{shared ? <><strong>Compra a tu manera.</strong> {onlineOrders?'Confirma tu pedido aquí. La tienda revisará disponibilidad y entrega.':'Arma tu pedido y confirma disponibilidad y entrega por WhatsApp.'}</> : <><strong>Versión de prueba.</strong> Productos, ilustraciones y precios de ejemplo. Confirma disponibilidad y total con la tienda.</>}</div>
+        <div className="benefits" id="como-comprar"><div><span><Icon name="bag" size={24}/></span><p><strong>Elige a tu gusto</strong><small>Explora y arma tu carrito</small></p></div><div><span><Icon name="arrow" size={24}/></span><p><strong>Pídelo por WhatsApp</strong><small>Coordinamos contigo directamente</small></p></div><div><span><Icon name="truck" size={24}/></span><p><strong>Recoge o recibe</strong><small>Elige lo que mejor te acomode</small></p></div></div>
+        <div className="notice">{shared ? <><strong>Compra a tu manera.</strong> Arma tu pedido y confirma disponibilidad y entrega por WhatsApp.</> : <><strong>Versión de prueba.</strong> Productos, ilustraciones y precios de ejemplo. Confirma disponibilidad y total con la tienda.</>}</div>
         {error && <p className="error" role="alert">{error}</p>}
         {loading && <p role="status">Cargando catálogo…</p>}
         <div className="shop-layout">
@@ -114,8 +87,7 @@ export default function Home() {
               {delivery === 'delivery' && <label className="field">Dirección<input name="address" autoComplete="street-address" required maxLength={200} placeholder="Calle, número y referencia" /></label>}
               <label className="field">Nota <span>(opcional)</span><textarea name="note" maxLength={500} placeholder="¿Algo que debamos saber?" rows={2} /></label>
               <div className="totals"><div><span>Subtotal</span><span>{money(subtotal)}</span></div><div><span>Delivery</span><span>{money(fee)}</span></div><div className="total"><strong>Total referencial</strong><strong>{money(subtotal + fee)}</strong></div></div>
-              <button className="primary checkout" disabled={!count||sending} type="submit">{sending?'Guardando pedido…':onlineOrders?'Confirmar pedido':'Pedir por WhatsApp'} <Icon name="arrow" size={17}/></button><p className="fine-print">{onlineOrders?'Guardaremos tu pedido sin abrir WhatsApp. La tienda debe confirmarlo antes de la entrega.':'Se abrirá WhatsApp con tu pedido. Revísalo y envíalo para coordinar; la tienda debe confirmar tu compra.'}</p>
-              {orderError&&<p className="error" role="alert">{orderError}</p>}{receipt&&<div className="receipt" role="status"><strong>{isPortablePreview()?'Pedido de demostración':'Pedido recibido'} #{receipt.number}</strong>Total: {money(Number(receipt.total))}.<br/>{isPortablePreview()?'Se guardó solo en este navegador; no se envió a la tienda ni al celular.':'La tienda revisará tu pedido y coordinará contigo. Conserva este número de referencia.'}</div>}
+              <button className="primary checkout" disabled={!count} type="submit">Pedir por WhatsApp <Icon name="arrow" size={17}/></button><p className="fine-print">Se abrirá WhatsApp con tu pedido. Revísalo y envíalo para coordinar; la tienda debe confirmar tu compra.</p>
               {sent && <p role="status" className="status">Si WhatsApp no se abrió, permite las ventanas emergentes y vuelve a intentar. Tu pedido sigue en el carrito.</p>}
             </form>
           </aside>

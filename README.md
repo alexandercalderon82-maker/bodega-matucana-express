@@ -11,7 +11,6 @@ npm ci
 npm run dev -- --hostname 0.0.0.0 --port 3000
 npm run lint
 npm run test:permissions
-npm run test:orders
 npm run build
 npm start -- --hostname 0.0.0.0 --port 3003
 ```
@@ -42,14 +41,10 @@ El panel agrupa productos por categorías, permite filtrar y buscar, seleccionar
 
 MatuMarket — **Tu compra cerca de casa**. Verde `#163F31`, crema `#FBF7E9`, naranja `#EF8447`. Emblema en `public/brand/matumarket-emblema.png`; composición del logo en `public/brand/logo.svg`. Fuentes del sistema, sin Google Fonts. La disponibilidad legal del nombre no se ha comprobado.
 
-Los productos locales de `app/products.js` son ejemplos. El teléfono, horario, dirección y tarifa de delivery provienen de la aplicación anterior: confirma esos datos con el negocio. El carrito vive en memoria. El cliente debe enviar el mensaje de WhatsApp y la tienda debe confirmar el pedido. Los pedidos se guardan en Supabase cuando se configura la integración descrita en [docs/pedidos-notificaciones.md](docs/pedidos-notificaciones.md). No se procesan pagos. El checkout por WhatsApp se conserva hasta disponer de tablas, claves y al menos un Android registrado. El panel incluye Pedidos y Notificaciones.
+Los productos locales de `app/products.js` son ejemplos. El teléfono, horario, dirección y tarifa de delivery provienen de la aplicación anterior: confirma esos datos con el negocio. El carrito vive en memoria. El cliente debe enviar el mensaje de WhatsApp y la tienda debe confirmar el pedido. Los pedidos se coordinan por WhatsApp: el cliente revisa y envía el mensaje, y la tienda confirma disponibilidad y entrega. No se registran pedidos automáticamente ni se procesan pagos. El panel conserva la administración de productos y categorías con correo y contraseña.
 
 ## Pruebas
 
 `npm run test:permissions` ejecuta el SQL real en PostgreSQL local mediante PGlite, representando los esquemas de Supabase Auth y Storage. Comprueba RLS, lectura pública limitada a productos activos, rechazo de escrituras sin autorización, imposibilidad de autoasignarse administrador, protección del bucket incluso con otra política permisiva, revocación, duplicados, precios inválidos, importación atómica y ejecución repetible del setup. No necesita claves ni conecta a un proyecto real.
 
 También se han comprobado en navegador los flujos del catálogo local, categorías vacías, edición de precio/imagen, persistencia, copias, carrito, layouts móviles y mensaje de WhatsApp interceptado sin enviar pedidos. La validación de autenticación, catálogo e imágenes contra el proyecto Supabase real queda pendiente de su activación y configuración.
-
-## Pedidos y Android
-
-Ejecuta `supabase/orders-push.sql` después del setup del catálogo y configura las variables de servidor exclusivamente en Vercel según [la guía](docs/pedidos-notificaciones.md). `public/preparar-notificaciones.html` genera las claves VAPID en el navegador del propietario sin transmitirlas. El service worker está en `public/sw.js`. Las pruebas de pedidos cubren privacidad, permisos, precios del servidor, idempotencia y límites; no envían compras ni avisos reales.
