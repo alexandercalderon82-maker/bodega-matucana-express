@@ -26,9 +26,11 @@ create table if not exists public.matumarket_products (
   image text not null default '' check(image = '' or image ~ '^https://' or image ~ '^/products/[a-z0-9-]+\.svg$'),
   active boolean not null default true,
   in_stock boolean not null default true,
+  stock_quantity integer check(stock_quantity between 0 and 1000000),
   updated_at timestamptz not null default now()
 );
 alter table public.matumarket_products add column if not exists in_stock boolean not null default true;
+alter table public.matumarket_products add column if not exists stock_quantity integer check(stock_quantity between 0 and 1000000);
 create or replace function public.matumarket_touch_product()
 returns trigger language plpgsql set search_path = public, pg_temp
 as $$ begin new.updated_at = now(); return new; end; $$;
@@ -84,10 +86,10 @@ begin
   end if;
   if jsonb_array_length(payload->'products') > 200 or jsonb_array_length(payload->'categories') > 50 then raise exception 'Catálogo demasiado grande'; end if;
   insert into public.matumarket_categories(name) select value from jsonb_array_elements_text(payload->'categories') on conflict(name) do nothing;
-  insert into public.matumarket_products(id,name,category,unit,price,image,active,in_stock)
-    select id,name,category,unit,price,coalesce(image,''),active,coalesce(in_stock,true)
-    from jsonb_to_recordset(payload->'products') as p(id text,name text,category text,unit text,price numeric,image text,active boolean,in_stock boolean)
-    on conflict(id) do update set name=excluded.name,category=excluded.category,unit=excluded.unit,price=excluded.price,image=excluded.image,active=excluded.active,in_stock=excluded.in_stock;
+  insert into public.matumarket_products(id,name,category,unit,price,image,active,in_stock,stock_quantity)
+    select id,name,category,unit,price,coalesce(image,''),active,coalesce(in_stock,true),stock_quantity
+    from jsonb_to_recordset(payload->'products') as p(id text,name text,category text,unit text,price numeric,image text,active boolean,in_stock boolean,stock_quantity integer)
+    on conflict(id) do update set name=excluded.name,category=excluded.category,unit=excluded.unit,price=excluded.price,image=excluded.image,active=excluded.active,in_stock=excluded.in_stock,stock_quantity=excluded.stock_quantity;
   delete from public.matumarket_products where id not in (select value->>'id' from jsonb_array_elements(payload->'products'));
   delete from public.matumarket_categories where name not in (select value from jsonb_array_elements_text(payload->'categories'));
 end; $$;

@@ -6,15 +6,19 @@ import Brand from './Brand';
 import Icon from './Icons';
 import ProductImage from './ProductImage';
 import StoreSettingsPanel from './StoreSettingsPanel';
+import InventorySalePanel from './InventorySalePanel';
+import {usePromotions} from '@/lib/promotions';
 import PromotionsPanel from './PromotionsPanel';
 import { useCatalog, saveCatalog, imageFromFile, validateProduct, validateCatalog, addCategory, saveProduct, usesSharedCatalog } from '@/lib/catalog';
 
-const blank = { id: '', name: '', category: 'Abarrotes', unit: '', price: '', image: '', active: true, in_stock: true };
+const blank = { id: '', name: '', category: 'Abarrotes', unit: '', price: '', image: '', active: true, in_stock: true, stock_quantity: null };
 
 export default function AdminPanel({ onStore, demo = false, onLogout }) {
-  const { products, categories, loading, error: catalogError, availabilityReady } = useCatalog();
+  const { products, categories, loading, error: catalogError, availabilityReady, quantityReady } = useCatalog();
+  const {promotions} = usePromotions();
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(blank);
+  const [originalStock,setOriginalStock] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,6 +44,7 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
   }, [editing, busy]);
 
   function open(product, category = selectedCategory) {
+    setOriginalStock(product?.stock_quantity ?? null);
     setDraft(product ? { ...product } : { ...blank, category: category || categories[0] || 'Abarrotes', id: crypto.randomUUID() });
     setEditing(product ? 'edit' : 'new'); setMessage(''); setError('');
   }
@@ -54,7 +59,7 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
     event.preventDefault(); setError(''); setBusy(true);
     try {
       const product = validateProduct({ ...draft, price: Number(draft.price) });
-      await saveProduct(product); setEditing(null); setMessage(`${product.name}: cambios guardados ${usesSharedCatalog() ? 'en la tienda compartida' : 'en este navegador'}.`);
+      await saveProduct(product, {updateStock: editing === 'new' || product.stock_quantity !== originalStock}); setEditing(null); setMessage(`${product.name}: cambios guardados ${usesSharedCatalog() ? 'en la tienda compartida' : 'en este navegador'}.`);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
   async function toggle(product) {
@@ -63,8 +68,9 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
     catch (e) { setError(e.message); } finally { setBusy(false); }
   }
   async function toggleStock(product) {
+    if(product.stock_quantity === 0) { open(product); setError('Indica una cantidad mayor a cero para reponer el producto.'); return; }
     setBusy(true); setError('');
-    try { await saveProduct({ ...product, in_stock: product.in_stock === false }); setMessage(`${product.name}: ${product.in_stock === false ? 'disponible' : 'agotado'}.`); }
+    try { await saveProduct({ ...product, in_stock: product.in_stock === false, ...(product.stock_quantity !== null ? {stock_quantity:0} : {}) },{updateStock: product.stock_quantity !== null}); setMessage(`${product.name}: ${product.in_stock === false ? 'disponible' : 'agotado'}.`); }
     catch (e) { setError(e.message); } finally { setBusy(false); }
   }
   function exportCatalog() {
@@ -101,6 +107,7 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
       <div className={demo ? "demo-banner" : "connection-banner"}><Icon name="settings"/><div><strong>{demo ? 'Panel de demostración local' : 'Administración con acceso autorizado'}</strong><p>{demo ? 'Los cambios se guardan solo en este navegador. El acceso real requiere la web conectada a Supabase.' : 'Los cambios se guardan en Supabase y se comparten con los clientes de la tienda.'}</p></div></div>
       <StoreSettingsPanel/>
       <PromotionsPanel products={products}/>
+      <InventorySalePanel products={products} promotions={promotions} quantityReady={quantityReady}/>
       {!loading && !availabilityReady && <p className="status">Para habilitar «Agotado», ejecuta supabase/availability-hours.sql en Supabase.</p>}
       <div className="admin-stats"><div><span>Productos</span><strong>{products.length}</strong></div><div><span>Visibles en tienda</span><strong>{products.filter(p => p.active).length}</strong></div><div><span>Categorías</span><strong>{categories.length}</strong></div></div>
       {loading && <p role="status" className="status">Cargando categorías y productos…</p>}
@@ -119,7 +126,8 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
 
         <label className="field">URL de imagen <span>(opcional, HTTPS)</span><input type="url" value={draft.image.startsWith('https://') ? draft.image : ''} placeholder="https://…" onChange={e => setDraft({ ...draft, image: e.target.value })}/></label>
         <label className="checkbox-field"><input type="checkbox" checked={draft.active} onChange={e => setDraft({ ...draft, active: e.target.checked })}/> Mostrar en la tienda</label>
-        <label className="checkbox-field"><input type="checkbox" disabled={!availabilityReady} checked={draft.in_stock !== false} onChange={e => setDraft({ ...draft, in_stock: e.target.checked })}/> Disponible para comprar</label><p className="muted">Desmarca para mostrar «Agotado». La visibilidad se controla por separado.</p>
+        <label className="field">Cantidad en stock<input type="number" min="0" max="1000000" step="1" disabled={!quantityReady} value={draft.stock_quantity ?? ''} onChange={e=>setDraft({...draft,stock_quantity:e.target.value===''?null:Number(e.target.value)})} placeholder="Sin cantidad configurada"/></label><p className="muted">Deja vacío si aún no conoces el stock. Cero muestra «Agotado». Cada unidad corresponde a la presentación del producto.</p>
+        <label className="checkbox-field"><input type="checkbox" disabled={!availabilityReady || draft.stock_quantity !== null} checked={draft.stock_quantity !== null ? draft.stock_quantity > 0 : draft.in_stock !== false} onChange={e => setDraft({ ...draft, in_stock: e.target.checked })}/> Disponible para comprar</label><p className="muted">Desmarca para mostrar «Agotado». La visibilidad se controla por separado.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="editor-actions"><button type="button" className="outline-button" onClick={() => setEditing(null)} disabled={busy}>Cancelar</button><button className="primary" disabled={busy} type="submit">Guardar cambios <Icon name="check" size={16}/></button></div>
       </form>}</section></div>}
@@ -130,5 +138,5 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
 
 function ProductTable({ products, toggle, toggleStock, availabilityReady, open, busy }) {
   if (!products.length) return <p className="empty category-empty">Esta categoría está lista. Agrega tu primer producto para empezar.</p>;
-  return <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Disponibilidad</th><th>Visibilidad</th><th><span className="sr-only">Acciones</span></th></tr></thead><tbody>{products.map(p => <tr key={p.id}><td><div className="admin-product"><ProductImage key={p.image} src={p.image} name={p.name}/><div><strong>{p.name}</strong><small>{p.unit}</small></div></div></td><td>{p.category}</td><td className="price">S/ {p.price.toFixed(2)}</td><td><button className={`visibility ${p.in_stock !== false ? 'is-active' : ''}`} disabled={busy || !availabilityReady} aria-label={`${p.in_stock === false ? 'Marcar disponible' : 'Marcar agotado'} ${p.name}`} onClick={() => toggleStock(p)}>{p.in_stock === false ? 'Agotado' : 'Disponible'}</button></td><td><button className={`visibility ${p.active ? 'is-active' : ''}`} aria-label={`${p.active ? 'Ocultar' : 'Mostrar'} ${p.name}`} disabled={busy} onClick={() => toggle(p)}>{p.active ? 'Visible' : 'Oculto'}</button></td><td><button className="text-button" aria-label={`Editar ${p.name}`} onClick={() => open(p)}>Editar <Icon name="arrow" size={14}/></button></td></tr>)}</tbody></table></div>;
+  return <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Disponibilidad</th><th>Visibilidad</th><th><span className="sr-only">Acciones</span></th></tr></thead><tbody>{products.map(p => <tr key={p.id}><td><div className="admin-product"><ProductImage key={p.image} src={p.image} name={p.name}/><div><strong>{p.name}</strong><small>{p.unit}</small></div></div></td><td>{p.category}</td><td className="price">S/ {p.price.toFixed(2)}</td><td>{p.stock_quantity ?? 'Sin configurar'}</td><td><button className={`visibility ${p.in_stock !== false ? 'is-active' : ''}`} disabled={busy || !availabilityReady} aria-label={`${p.in_stock === false ? 'Marcar disponible' : 'Marcar agotado'} ${p.name}`} onClick={() => toggleStock(p)}>{p.in_stock === false ? 'Agotado' : 'Disponible'}</button></td><td><button className={`visibility ${p.active ? 'is-active' : ''}`} aria-label={`${p.active ? 'Ocultar' : 'Mostrar'} ${p.name}`} disabled={busy} onClick={() => toggle(p)}>{p.active ? 'Visible' : 'Oculto'}</button></td><td><button className="text-button" aria-label={`Editar ${p.name}`} onClick={() => open(p)}>Editar <Icon name="arrow" size={14}/></button></td></tr>)}</tbody></table></div>;
 }
