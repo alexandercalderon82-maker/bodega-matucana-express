@@ -38,6 +38,8 @@ try {
   await db.exec(schema); checks++; // Repeatable setup.
   const settingsSchema = await readFile(new URL('../supabase/store-settings.sql', import.meta.url), 'utf8');
   await db.exec(settingsSchema); await db.exec(settingsSchema); checks++;
+  const promotionSchema = await readFile(new URL('../supabase/promotions.sql', import.meta.url), 'utf8');
+  await db.exec(promotionSchema); await db.exec(promotionSchema); checks++;
   const settingsValue = {deliveryFee:5,deliveryZones:'Matucana',deliveryTime:'A coordinar',deliveryHours:'7 a 22',paymentMethods:['Yape'],paymentInstructions:'Confirmar antes de pagar'};
   await db.query('insert into public.matumarket_store_settings(id,settings) values(1,$1) on conflict(id) do update set settings=excluded.settings', [JSON.stringify(settingsValue)]);
   await db.query('insert into auth.users(id) values($1),($2)', [admin, customer]);
@@ -72,14 +74,34 @@ try {
   await deny('select public.matumarket_replace_catalog($1::jsonb)',[JSON.stringify(invalid)]);
   assert.equal((await db.query("select * from public.matumarket_categories where name='Rollback'")).rows.length,0); checks++;
   assert.equal((await db.query("select price from public.matumarket_products where id='public'")).rows[0].price,'5.00'); checks++;
+  const promoId = '00000000-0000-4000-8000-000000000099';
+  const promoItems = JSON.stringify([{productId:'public',qty:1},{productId:'hidden',qty:2}]);
+  await db.query("insert into public.matumarket_promotions(id,name,kind,items,price,active) values($1,'Combo prueba','combo',$2,8,false)",[promoId,promoItems]);
+  await role('anon');
+  assert.equal((await db.query('select * from public.matumarket_promotions')).rows.length,0); checks++;
+  await deny("insert into public.matumarket_promotions(id,name,kind,items,price) values('00000000-0000-4000-8000-000000000088','Intruso','offer','[]',1)");
+  await role('authenticated',customer);
+  assert.equal((await db.query('update public.matumarket_promotions set active=true returning id')).rows.length,0); checks++;
+  await role('authenticated',admin);
+  await db.exec("update public.matumarket_promotions set active=true");
+  await deny("update public.matumarket_promotions set price=99");
+  await deny("update public.matumarket_promotions set items='[{\"productId\":\"public\",\"qty\":1.5},{\"productId\":\"hidden\",\"qty\":1}]'");
+  await deny("update public.matumarket_promotions set items='[{\"productId\":\"missing\",\"qty\":1},{\"productId\":\"hidden\",\"qty\":1}]'");
+  await deny("update public.matumarket_promotions set ends_at='2026-01-01',starts_at='2026-02-01'");
+  await role('anon');
+  assert.equal((await db.query('select * from public.matumarket_promotions')).rows.length,1); checks++;
+  await role('authenticated',admin);
   const replacement = {categories:['Nueva'],products:[{id:'new',name:'Nuevo',category:'Nueva',unit:'1 kg',price:7.5,image:'https://example.com/image.webp',active:true}]};
   await db.query('select public.matumarket_replace_catalog($1::jsonb)',[JSON.stringify(replacement)]);
   assert.equal((await db.query('select * from public.matumarket_products')).rows.length,1); checks++;
+  await db.exec('update public.matumarket_promotions set active=false');
+  assert.equal((await db.query('select active from public.matumarket_promotions')).rows[0].active,false); checks++;
   await db.exec('reset role');await db.query('delete from public.matumarket_admins where user_id=$1',[admin]);
   await role('authenticated', admin);
   assert.equal((await db.query('select public.matumarket_is_admin() as admin')).rows[0].admin,false); checks++;
   await deny("insert into public.matumarket_categories(name) values('Unauthorized')");
   assert.equal((await db.query("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','99') where id=1 returning id")).rows.length,0); checks++;
+  assert.equal((await db.query('update public.matumarket_promotions set active=false returning id')).rows.length,0); checks++;
   await deny(storageInsert);
   console.log(`PASS: ${checks} comprobaciones de permisos PostgreSQL, RLS, revocación, Storage, importación atómica y repetibilidad. No usa un proyecto Supabase real.`);
 } finally { await db.close(); }

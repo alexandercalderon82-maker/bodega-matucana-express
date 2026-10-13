@@ -6,6 +6,7 @@ import Brand from './Brand';
 import Icon from './Icons';
 import ProductImage from './ProductImage';
 import StoreSettingsPanel from './StoreSettingsPanel';
+import PromotionsPanel from './PromotionsPanel';
 import { useCatalog, saveCatalog, imageFromFile, validateProduct, validateCatalog, addCategory, saveProduct, usesSharedCatalog } from '@/lib/catalog';
 
 const blank = { id: '', name: '', category: 'Abarrotes', unit: '', price: '', image: '', active: true };
@@ -94,6 +95,7 @@ export default function AdminPanel({ onStore, demo = false, onLogout }) {
       <div className="admin-title"><div><span className="eyebrow">TU NEGOCIO, A TU MANERA</span><h1>Control de productos</h1><p>Actualiza tu catálogo en unos pocos pasos.</p></div><div className="admin-title-actions"><button className="outline-button" disabled={busy || loading} onClick={openCategory}><Icon name="plus" size={18}/> Nueva categoría</button><button className="primary" disabled={busy || loading || !categories.length} title={!categories.length ? 'Crea una categoría primero' : undefined} onClick={() => open()}><Icon name="plus" size={18}/> Nuevo producto</button></div></div>
       <div className={demo ? "demo-banner" : "connection-banner"}><Icon name="settings"/><div><strong>{demo ? 'Panel de demostración local' : 'Administración con acceso autorizado'}</strong><p>{demo ? 'Los cambios se guardan solo en este navegador. El acceso real requiere la web conectada a Supabase.' : 'Los cambios se guardan en Supabase y se comparten con los clientes de la tienda.'}</p></div></div>
       <StoreSettingsPanel/>
+      <PromotionsPanel products={products}/>
       <div className="admin-stats"><div><span>Productos</span><strong>{products.length}</strong></div><div><span>Visibles en tienda</span><strong>{products.filter(p => p.active).length}</strong></div><div><span>Categorías</span><strong>{categories.length}</strong></div></div>
       {loading && <p role="status" className="status">Cargando categorías y productos…</p>}
       {message && <p className="status" role="status"><Icon name="check"/>{message}</p>}
