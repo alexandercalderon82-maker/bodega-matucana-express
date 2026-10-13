@@ -39,7 +39,7 @@ try {
   const settingsSchema = await readFile(new URL('../supabase/store-settings.sql', import.meta.url), 'utf8');
   await db.exec(settingsSchema); await db.exec(settingsSchema); checks++;
   const settingsValue = {deliveryFee:5,deliveryZones:'Matucana',deliveryTime:'A coordinar',deliveryHours:'7 a 22',paymentMethods:['Yape'],paymentInstructions:'Confirmar antes de pagar'};
-  await db.query('insert into public.matumarket_store_settings(id,settings) values(1,$1)', [JSON.stringify(settingsValue)]);
+  await db.query('insert into public.matumarket_store_settings(id,settings) values(1,$1) on conflict(id) do update set settings=excluded.settings', [JSON.stringify(settingsValue)]);
   await db.query('insert into auth.users(id) values($1),($2)', [admin, customer]);
   await db.query('insert into public.matumarket_admins(user_id) values($1)', [admin]);
   await db.exec("insert into public.matumarket_categories(name) values('Bebidas'); insert into public.matumarket_products(id,name,category,unit,price,active) values('public','Agua','Bebidas','1 litro',2,true),('hidden','Agua oculta','Bebidas','1 litro',3,false)");
@@ -65,6 +65,7 @@ try {
   await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','-1') where id=1");
   await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{paymentMethods}','[\"Desconocido\"]') where id=1");
   await deny("update public.matumarket_store_settings set settings='{}' where id=1");
+  await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{centerDeliveryFee}','-1') where id=1");
   await deny("insert into public.matumarket_categories(name) values('panaderia')");
   await deny("update public.matumarket_products set price=-1 where id='public'");
   const invalid = { categories:['Bebidas','Rollback'], products:[{id:'bad',name:'Error',category:'Rollback',unit:'1',price:-1,image:'',active:true}] };
