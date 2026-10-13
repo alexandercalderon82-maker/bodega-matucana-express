@@ -25,7 +25,8 @@ for (const directory of ['products', 'brand']) {
     assets[`/${directory}/${file}`] = `data:${type};base64,${(await readFile(resolve(root,'public',directory,file))).toString('base64')}`;
   }
 }
-const css = await readFile(resolve(root, 'app/globals.css'), 'utf8');
+const leafletCss = (await readFile(resolve(root, 'node_modules/leaflet/dist/leaflet.css'), 'utf8')).replace(/url\([^)]*\)/g, 'none');
+const css = leafletCss + '\n' + await readFile(resolve(root, 'app/globals.css'), 'utf8');
 const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 await writeFile(target, `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MatuMarket · Versión de prueba</title><style>${css}</style></head><body><div id="root"></div><script>window.__MATUMARKET_PREVIEW__=true;window.__MATUMARKET_ASSETS__=${JSON.stringify(assets)};</script><script>${js}</script></body></html>`);
 console.log(`Prueba independiente generada: ${target}`);

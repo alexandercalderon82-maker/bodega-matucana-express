@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { store } from './products';
 import Brand from '@/components/Brand';
 import Icon from '@/components/Icons';
+import DeliveryMap from '@/components/DeliveryMap';
+import {locationLink} from '@/lib/delivery-location';
 import ProductImage from '@/components/ProductImage';
 import AdminAccess from '@/components/AdminAccess';
 import { useCatalog, usesSharedCatalog } from '@/lib/catalog';
@@ -21,6 +23,7 @@ export default function Home() {
   const [cart, setCart] = useState({});
   const [delivery, setDelivery] = useState('pickup');
   const [sent, setSent] = useState(false);
+  const [deliveryPoint,setDeliveryPoint]=useState(null);
   const items = products.filter(p => cart[p.id]).map(p => ({ ...p, qty: cart[p.id] }));
   const count = items.reduce((sum, p) => sum + p.qty, 0);
   const subtotal = items.reduce((sum, p) => sum + p.price * p.qty, 0);
@@ -44,7 +47,8 @@ export default function Home() {
       `Hola, ${store.name}. Quisiera consultar este pedido:`,
       shared ? 'Por favor confirmar disponibilidad y entrega.' : 'Catálogo de ejemplo: por favor confirmar productos, precios y disponibilidad.',
       '', `Nombre: ${name}`, `Celular: ${phone}`,
-      delivery === 'delivery' ? `Delivery a: ${address}` : 'Recojo en tienda', '',
+      delivery === 'delivery' ? `Delivery a: ${address}` : 'Recojo en tienda',
+      ...(delivery==='delivery'&&locationLink(deliveryPoint)?[`Ubicación de entrega: ${locationLink(deliveryPoint)}`]:[]), '',
       ...items.map(p => `• ${p.name} (${p.unit}) × ${p.qty}: ${money(p.price * p.qty)}`),
       '', `Subtotal referencial: ${money(subtotal)}`, `Delivery referencial: ${money(fee)}`, `Total referencial: ${money(subtotal + fee)}`,
       `Nota: ${String(data.get('note') || '').trim() || 'Sin nota'}`,
@@ -84,7 +88,7 @@ export default function Home() {
             <form onSubmit={order}><fieldset><legend>¿Cómo lo recibes?</legend><label><input type="radio" name="deliveryType" value="pickup" checked={delivery === 'pickup'} onChange={() => setDelivery('pickup')} /> Recojo en tienda</label><label><input type="radio" name="deliveryType" value="delivery" checked={delivery === 'delivery'} onChange={() => setDelivery('delivery')} /> Delivery · {money(store.deliveryFee)}</label></fieldset>
               <label className="field">Tu nombre<input name="name" autoComplete="name" required maxLength={100} placeholder="¿Cómo te llamas?" /></label>
               <label className="field">Celular<input name="phone" type="tel" autoComplete="tel" required pattern="[+0-9 ()-]{6,20}" maxLength={20} placeholder="Tu número de contacto" /></label>
-              {delivery === 'delivery' && <label className="field">Dirección<input name="address" autoComplete="street-address" required maxLength={200} placeholder="Calle, número y referencia" /></label>}
+              {delivery === 'delivery' && <><label className="field">Dirección y referencia<input name="address" autoComplete="street-address" required maxLength={200} placeholder="Calle, número, piso o color de fachada" /></label><DeliveryMap value={deliveryPoint} onChange={setDeliveryPoint}/></>}
               <label className="field">Nota <span>(opcional)</span><textarea name="note" maxLength={500} placeholder="¿Algo que debamos saber?" rows={2} /></label>
               <div className="totals"><div><span>Subtotal</span><span>{money(subtotal)}</span></div><div><span>Delivery</span><span>{money(fee)}</span></div><div className="total"><strong>Total referencial</strong><strong>{money(subtotal + fee)}</strong></div></div>
               <button className="primary checkout" disabled={!count} type="submit">Pedir por WhatsApp <Icon name="arrow" size={17}/></button><p className="fine-print">Se abrirá WhatsApp con tu pedido. Revísalo y envíalo para coordinar; la tienda debe confirmar tu compra.</p>

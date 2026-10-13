@@ -48,3 +48,13 @@ Los productos locales de `app/products.js` son ejemplos. El teléfono, horario, 
 `npm run test:permissions` ejecuta el SQL real en PostgreSQL local mediante PGlite, representando los esquemas de Supabase Auth y Storage. Comprueba RLS, lectura pública limitada a productos activos, rechazo de escrituras sin autorización, imposibilidad de autoasignarse administrador, protección del bucket incluso con otra política permisiva, revocación, duplicados, precios inválidos, importación atómica y ejecución repetible del setup. No necesita claves ni conecta a un proyecto real.
 
 También se han comprobado en navegador los flujos del catálogo local, categorías vacías, edición de precio/imagen, persistencia, copias, carrito, layouts móviles y mensaje de WhatsApp interceptado sin enviar pedidos. La validación de autenticación, catálogo e imágenes contra el proyecto Supabase real queda pendiente de su activación y configuración.
+
+## Mapa de entrega
+
+Al elegir Delivery aparece un mapa centrado en Matucana con Leaflet y los mapas públicos de OpenStreetMap. El cliente puede tocar el punto, arrastrar el marcador o pulsar «Usar mi ubicación»; la ubicación del dispositivo se solicita únicamente con ese clic y requiere su permiso y una conexión HTTPS. La precisión del GPS se muestra como aproximada y el marcador se puede corregir. «Marcar centro del mapa» permite seleccionar con controles de teclado. El centro inicial no se envía como dirección sin selección explícita.
+
+El mensaje de WhatsApp incluye un enlace a Google Maps con las coordenadas elegidas, además de la dirección y referencia escritas. Para recojo no se incluye ubicación. El punto es opcional y la dirección escrita sigue siendo necesaria: el cliente puede continuar si rechaza el permiso o no carga el mapa. La tienda confirma cobertura y delivery; el mapa no define una zona ni un precio nuevos. No se almacenan coordenadas en Supabase ni se envía el pedido automáticamente.
+
+No necesita claves de mapas ni un servicio de API de pago. Se mantiene la atribución visible a OpenStreetMap y Leaflet, se usan los tiles HTTPS estándar, la caché HTTP del navegador y su Referer; no se realizan precargas ni descargas offline. Respeta la [política del servicio](https://operations.osmfoundation.org/policies/tiles/) y revisa el proveedor si aumenta mucho el tráfico. No se utiliza geocodificación automática.
+
+La demostración HTML descargable muestra un enlace a la tienda publicada en lugar de solicitar tiles sin un Referer web válido. El mapa interactivo se prueba en la web. Las comprobaciones en navegador cubrieron geolocalización simulada, clic, arrastre, coordenadas correctas en WhatsApp, recojo, quitar punto, permisos denegados y tiles fallidos, sin enviar mensajes ni modificar datos del negocio.
