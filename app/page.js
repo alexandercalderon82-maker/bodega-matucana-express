@@ -58,7 +58,10 @@ export default function Home() {
       ...(String(data.get('note') || '').trim() ? ['', `📝 *Nota:* ${String(data.get('note')).trim()}`] : []),
       '', shared ? '✅ Por favor, confirmen disponibilidad, total y horario de entrega o recojo. ¡Gracias!' : '✅ Catálogo de ejemplo: por favor, confirmen productos, precios y disponibilidad. ¡Gracias!',
     ].join('\n');
-    window.open(`https://wa.me/${store.whatsapp}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    const whatsappUrl = new URL('https://api.whatsapp.com/send');
+    whatsappUrl.searchParams.set('phone', store.whatsapp);
+    whatsappUrl.searchParams.set('text', message);
+    window.open(whatsappUrl.toString(), '_blank', 'noopener,noreferrer');
     setSent(true);
   }
 
