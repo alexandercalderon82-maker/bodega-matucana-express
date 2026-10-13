@@ -44,14 +44,19 @@ export default function Home() {
     const address = String(data.get('address') || '').trim();
     if (!name || !phone || (delivery === 'delivery' && !address)) return;
     const message = [
-      `Hola, ${store.name}. Quisiera consultar este pedido:`,
-      shared ? 'Por favor confirmar disponibilidad y entrega.' : 'Catálogo de ejemplo: por favor confirmar productos, precios y disponibilidad.',
-      '', `Nombre: ${name}`, `Celular: ${phone}`,
-      delivery === 'delivery' ? `Delivery a: ${address}` : 'Recojo en tienda',
-      ...(delivery==='delivery'&&locationLink(deliveryPoint)?[`Ubicación de entrega: ${locationLink(deliveryPoint)}`]:[]), '',
+      `🛍️ *PEDIDO · ${store.name}*`,
+      '¡Hola! Me gustaría realizar el siguiente pedido.',
+      '', '👤 *Datos del cliente*', `Nombre: ${name}`, `Celular: ${phone}`,
+      '', delivery === 'delivery' ? '🛵 *Entrega a domicilio*' : '🏪 *Recojo en tienda*',
+      delivery === 'delivery' ? `Dirección y referencia: ${address}` : `Dirección: ${store.address}`,
+      ...(delivery==='delivery'&&locationLink(deliveryPoint)?[`📍 Ubicación en el mapa: ${locationLink(deliveryPoint)}`]:[]),
+      '', '📦 *Productos*',
       ...items.map(p => `• ${p.name} (${p.unit}) × ${p.qty}: ${money(p.price * p.qty)}`),
-      '', `Subtotal referencial: ${money(subtotal)}`, `Delivery referencial: ${money(fee)}`, `Total referencial: ${money(subtotal + fee)}`,
-      `Nota: ${String(data.get('note') || '').trim() || 'Sin nota'}`,
+      '', '💰 *Resumen del pedido*', `Subtotal referencial: ${money(subtotal)}`,
+      ...(delivery === 'delivery' ? [`Delivery referencial: ${money(fee)}`] : []),
+      `*Total referencial: ${money(subtotal + fee)}*`,
+      ...(String(data.get('note') || '').trim() ? ['', `📝 *Nota:* ${String(data.get('note')).trim()}`] : []),
+      '', shared ? '✅ Por favor, confirmen disponibilidad, total y horario de entrega o recojo. ¡Gracias!' : '✅ Catálogo de ejemplo: por favor, confirmen productos, precios y disponibilidad. ¡Gracias!',
     ].join('\n');
     window.open(`https://wa.me/${store.whatsapp}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
     setSent(true);
