@@ -36,6 +36,10 @@ try {
   const schema = await readFile(new URL('../supabase/setup.sql', import.meta.url), 'utf8');
   await db.exec(schema);
   await db.exec(schema); checks++; // Repeatable setup.
+  const settingsSchema = await readFile(new URL('../supabase/store-settings.sql', import.meta.url), 'utf8');
+  await db.exec(settingsSchema); await db.exec(settingsSchema); checks++;
+  const settingsValue = {deliveryFee:5,deliveryZones:'Matucana',deliveryTime:'A coordinar',deliveryHours:'7 a 22',paymentMethods:['Yape'],paymentInstructions:'Confirmar antes de pagar'};
+  await db.query('insert into public.matumarket_store_settings(id,settings) values(1,$1)', [JSON.stringify(settingsValue)]);
   await db.query('insert into auth.users(id) values($1),($2)', [admin, customer]);
   await db.query('insert into public.matumarket_admins(user_id) values($1)', [admin]);
   await db.exec("insert into public.matumarket_categories(name) values('Bebidas'); insert into public.matumarket_products(id,name,category,unit,price,active) values('public','Agua','Bebidas','1 litro',2,true),('hidden','Agua oculta','Bebidas','1 litro',3,false)");
@@ -43,16 +47,24 @@ try {
   const storageInsert = "insert into storage.objects(bucket_id,name) values('matumarket-images','products/unauthorized.webp')";
   await role('anon');
   assert.equal((await db.query('select * from public.matumarket_products')).rows.length,1); checks++;
+  assert.equal((await db.query('select * from public.matumarket_store_settings')).rows.length,1); checks++;
+  await deny("insert into public.matumarket_store_settings(id,settings) values(1,'{}')");
   await deny(insert); await deny('select * from public.matumarket_admins'); await deny(storageInsert);
   await role('authenticated', customer);
   assert.equal((await db.query('select * from public.matumarket_admins')).rows.length,0); checks++;
   await deny('insert into public.matumarket_admins(user_id) values($1)',[customer]);
+  assert.equal((await db.query("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','99') where id=1 returning id")).rows.length,0); checks++;
   await deny(insert); await deny(storageInsert);
   assert.equal((await db.query("update public.matumarket_products set price=99 where id='public' returning id")).rows.length,0); checks++;
   await deny("select public.matumarket_replace_catalog($1::jsonb)",[JSON.stringify({products:[],categories:[]})]);
   await role('authenticated', admin);
   assert.equal((await db.query('select * from public.matumarket_products')).rows.length,2); checks++;
   await db.exec("insert into public.matumarket_categories(name) values('Panadería'); update public.matumarket_products set price=5 where id='public'; insert into storage.objects(bucket_id,name) values('matumarket-images','products/admin.webp')"); checks++;
+  await db.exec("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','7.5') where id=1");
+  assert.equal((await db.query("select settings->>'deliveryFee' as fee from public.matumarket_store_settings")).rows[0].fee,'7.5'); checks++;
+  await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','-1') where id=1");
+  await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{paymentMethods}','[\"Desconocido\"]') where id=1");
+  await deny("update public.matumarket_store_settings set settings='{}' where id=1");
   await deny("insert into public.matumarket_categories(name) values('panaderia')");
   await deny("update public.matumarket_products set price=-1 where id='public'");
   const invalid = { categories:['Bebidas','Rollback'], products:[{id:'bad',name:'Error',category:'Rollback',unit:'1',price:-1,image:'',active:true}] };
@@ -66,6 +78,7 @@ try {
   await role('authenticated', admin);
   assert.equal((await db.query('select public.matumarket_is_admin() as admin')).rows[0].admin,false); checks++;
   await deny("insert into public.matumarket_categories(name) values('Unauthorized')");
+  assert.equal((await db.query("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','99') where id=1 returning id")).rows.length,0); checks++;
   await deny(storageInsert);
   console.log(`PASS: ${checks} comprobaciones de permisos PostgreSQL, RLS, revocación, Storage, importación atómica y repetibilidad. No usa un proyecto Supabase real.`);
 } finally { await db.close(); }

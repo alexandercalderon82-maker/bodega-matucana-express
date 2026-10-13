@@ -6,6 +6,7 @@ import Brand from '@/components/Brand';
 import Icon from '@/components/Icons';
 import DeliveryMap from '@/components/DeliveryMap';
 import {locationLink} from '@/lib/delivery-location';
+import { useStoreSettings } from '@/lib/store-settings';
 import ProductImage from '@/components/ProductImage';
 import AdminAccess from '@/components/AdminAccess';
 import { useCatalog, usesSharedCatalog } from '@/lib/catalog';
@@ -14,6 +15,7 @@ const money = value => `S/ ${value.toFixed(2)}`;
 
 export default function Home() {
   const shared = usesSharedCatalog();
+  const { settings } = useStoreSettings();
   const { products: catalog, categories: catalogCategories, error, loading } = useCatalog();
   const products = catalog.filter(p => p.active);
   const categories = ['Todo', ...catalogCategories];
@@ -27,7 +29,7 @@ export default function Home() {
   const items = products.filter(p => cart[p.id]).map(p => ({ ...p, qty: cart[p.id] }));
   const count = items.reduce((sum, p) => sum + p.qty, 0);
   const subtotal = items.reduce((sum, p) => sum + p.price * p.qty, 0);
-  const fee = delivery === 'delivery' && count ? store.deliveryFee : 0;
+  const fee = delivery === 'delivery' && count ? settings.deliveryFee : 0;
   const visible = products.filter(p => (category === 'Todo' || p.category === category) && p.name.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
 
   function change(id, delta) {
@@ -43,6 +45,8 @@ export default function Home() {
     const phone = String(data.get('phone') || '').trim();
     const address = String(data.get('address') || '').trim();
     if (!name || !phone || (delivery === 'delivery' && !address)) return;
+    const requestedPayment = String(data.get('payment') || '');
+    const payment = settings.paymentMethods.includes(requestedPayment) ? requestedPayment : 'A coordinar por WhatsApp';
     const message = [
       `🛍️ *PEDIDO · ${store.name}*`,
       '¡Hola! Me gustaría realizar el siguiente pedido.',
@@ -55,6 +59,7 @@ export default function Home() {
       '', '💰 *Resumen del pedido*', `Subtotal referencial: ${money(subtotal)}`,
       ...(delivery === 'delivery' ? [`Delivery referencial: ${money(fee)}`] : []),
       `*Total referencial: ${money(subtotal + fee)}*`,
+      '', `💳 *Forma de pago:* ${payment}`,
       ...(String(data.get('note') || '').trim() ? ['', `📝 *Nota:* ${String(data.get('note')).trim()}`] : []),
       '', shared ? '✅ Por favor, confirmen disponibilidad, total y horario de entrega o recojo. ¡Gracias!' : '✅ Catálogo de ejemplo: por favor, confirmen productos, precios y disponibilidad. ¡Gracias!',
     ].join('\n');
@@ -93,10 +98,12 @@ export default function Home() {
           </section>
           <aside className="order" id="pedido"><div className="section-heading"><h2>Tu bolsa</h2><span className="count-badge">{count}</span></div><p className="muted">Tus favoritos están a un mensaje de distancia.</p>
             {!count ? <div className="empty"><div className="empty-bag"><Icon name="bag" size={32}/></div><p>Tu carrito está esperando.<br />Agrega tus productos favoritos.</p></div> : <ul className="cart-items">{items.map(p => <li key={p.id}><div><strong>{p.name}</strong><small>{money(p.price * p.qty)}</small></div><div className="quantity"><button aria-label={`Quitar una unidad de ${p.name}`} onClick={() => change(p.id, -1)}>−</button><span>{p.qty}</span><button aria-label={`Agregar una unidad de ${p.name}`} onClick={() => change(p.id, 1)}><Icon name="plus" size={18}/></button></div></li>)}</ul>}
-            <form onSubmit={order}><fieldset><legend>¿Cómo lo recibes?</legend><label><input type="radio" name="deliveryType" value="pickup" checked={delivery === 'pickup'} onChange={() => setDelivery('pickup')} /> Recojo en tienda</label><label><input type="radio" name="deliveryType" value="delivery" checked={delivery === 'delivery'} onChange={() => setDelivery('delivery')} /> Delivery · {money(store.deliveryFee)}</label></fieldset>
+            <form onSubmit={order}><fieldset><legend>¿Cómo lo recibes?</legend><label><input type="radio" name="deliveryType" value="pickup" checked={delivery === 'pickup'} onChange={() => setDelivery('pickup')} /> Recojo en tienda</label><label><input type="radio" name="deliveryType" value="delivery" checked={delivery === 'delivery'} onChange={() => setDelivery('delivery')} /> Delivery · {money(settings.deliveryFee)}</label></fieldset>
+              <div className="purchase-conditions"><strong>{delivery === 'delivery' ? 'Información de entrega' : 'Recojo en tienda'}</strong>{delivery === 'delivery' ? <><p><b>Cobertura:</b> {settings.deliveryZones}</p><p><b>Horario:</b> {settings.deliveryHours}</p><p><b>Tiempo estimado:</b> {settings.deliveryTime}</p><p><b>Costo referencial:</b> {money(settings.deliveryFee)}. Confirmamos cobertura y total por WhatsApp antes del pago.</p></> : <><p>{store.address}</p><p>Atención: {store.hours}. Coordinamos cuándo estará listo tu pedido por WhatsApp.</p></>}</div>
               <label className="field">Tu nombre<input name="name" autoComplete="name" required maxLength={100} placeholder="¿Cómo te llamas?" /></label>
               <label className="field">Celular<input name="phone" type="tel" autoComplete="tel" required pattern="[+0-9 ()-]{6,20}" maxLength={20} placeholder="Tu número de contacto" /></label>
               {delivery === 'delivery' && <><label className="field">Dirección y referencia<input name="address" autoComplete="street-address" required maxLength={200} placeholder="Calle, número, piso o color de fachada" /></label><DeliveryMap value={deliveryPoint} onChange={setDeliveryPoint}/></>}
+              <label className="field">Forma de pago<select name="payment" aria-label="Forma de pago" defaultValue=""><option value="">Coordinar por WhatsApp</option>{settings.paymentMethods.map(method => <option key={method} value={method}>{method}</option>)}</select></label><p className="payment-instructions">{settings.paymentInstructions}</p>
               <label className="field">Nota <span>(opcional)</span><textarea name="note" maxLength={500} placeholder="¿Algo que debamos saber?" rows={2} /></label>
               <div className="totals"><div><span>Subtotal</span><span>{money(subtotal)}</span></div><div><span>Delivery</span><span>{money(fee)}</span></div><div className="total"><strong>Total referencial</strong><strong>{money(subtotal + fee)}</strong></div></div>
               <button className="primary checkout" disabled={!count} type="submit">Pedir por WhatsApp <Icon name="arrow" size={17}/></button><p className="fine-print">Se abrirá WhatsApp con tu pedido. Revísalo y envíalo para coordinar; la tienda debe confirmar tu compra.</p>

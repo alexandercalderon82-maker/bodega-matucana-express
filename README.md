@@ -58,3 +58,11 @@ El mensaje de WhatsApp incluye un enlace a Google Maps con las coordenadas elegi
 No necesita claves de mapas ni un servicio de API de pago. Se mantiene la atribución visible a OpenStreetMap y Leaflet, se usan los tiles HTTPS estándar, la caché HTTP del navegador y su Referer; no se realizan precargas ni descargas offline. Respeta la [política del servicio](https://operations.osmfoundation.org/policies/tiles/) y revisa el proveedor si aumenta mucho el tráfico. No se utiliza geocodificación automática.
 
 La demostración HTML descargable muestra un enlace a la tienda publicada en lugar de solicitar tiles sin un Referer web válido. El mapa interactivo se prueba en la web. Las comprobaciones en navegador cubrieron geolocalización simulada, clic, arrastre, coordenadas correctas en WhatsApp, recojo, quitar punto, permisos denegados y tiles fallidos, sin enviar mensajes ni modificar datos del negocio.
+
+### Condiciones de entrega y pagos
+
+La bolsa muestra cobertura, horario, tiempo estimado, costo y condiciones de pago antes de abrir WhatsApp. No se anuncian Yape, Plin ni efectivo hasta que el propietario los habilite. El pedido incluye la preferencia de pago; no realiza cobros ni confirma compras automáticamente.
+
+Para compartir estos ajustes entre dispositivos, ejecuta `supabase/store-settings.sql` en el SQL Editor del proyecto existente después de `supabase/setup.sql`. Es repetible y crea únicamente `matumarket_store_settings`: lectura pública, escritura de administradores autorizados mediante RLS y validación de valores. No modifica productos ni cuentas. Luego abre el panel y despliega **Condiciones de entrega y métodos de pago** para actualizar el costo, zonas, horario, plazo, pagos aceptados e instrucciones. No publiques credenciales ni datos privados en estos textos públicos.
+
+Si la tabla todavía no existe, la tienda conserva el costo previo de S/ 5 y muestra cobertura, plazo y pago a confirmar por WhatsApp. El panel explica la configuración pendiente y deshabilita guardar. La demostración portable guarda estos ajustes solo en el navegador. `npm run test:permissions` incluye lectura pública, rechazo de cambios anónimos o de usuarios sin autorización, cambios del administrador, validación y revocación de acceso para la tabla nueva.
