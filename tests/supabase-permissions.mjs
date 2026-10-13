@@ -45,6 +45,10 @@ try {
   await db.query('insert into auth.users(id) values($1),($2)', [admin, customer]);
   await db.query('insert into public.matumarket_admins(user_id) values($1)', [admin]);
   await db.exec("insert into public.matumarket_categories(name) values('Bebidas'); insert into public.matumarket_products(id,name,category,unit,price,active) values('public','Agua','Bebidas','1 litro',2,true),('hidden','Agua oculta','Bebidas','1 litro',3,false)");
+  const availabilitySchema = await readFile(new URL('../supabase/availability-hours.sql', import.meta.url), 'utf8');
+  await db.exec('alter table public.matumarket_products drop column in_stock');
+  await db.exec(availabilitySchema); await db.exec(availabilitySchema); checks++;
+  assert.equal((await db.query('select count(*) as n from public.matumarket_products where in_stock')).rows[0].n,2); checks++;
   const insert = "insert into public.matumarket_products(id,name,category,unit,price) values('intruder','Intruso','Bebidas','1 litro',1)";
   const storageInsert = "insert into storage.objects(bucket_id,name) values('matumarket-images','products/unauthorized.webp')";
   await role('anon');
@@ -56,6 +60,7 @@ try {
   assert.equal((await db.query('select * from public.matumarket_admins')).rows.length,0); checks++;
   await deny('insert into public.matumarket_admins(user_id) values($1)',[customer]);
   assert.equal((await db.query("update public.matumarket_store_settings set settings=jsonb_set(settings,'{deliveryFee}','99') where id=1 returning id")).rows.length,0); checks++;
+  assert.equal((await db.query('update public.matumarket_products set in_stock=false returning id')).rows.length,0); checks++;
   await deny(insert); await deny(storageInsert);
   assert.equal((await db.query("update public.matumarket_products set price=99 where id='public' returning id")).rows.length,0); checks++;
   await deny("select public.matumarket_replace_catalog($1::jsonb)",[JSON.stringify({products:[],categories:[]})]);
@@ -91,9 +96,18 @@ try {
   await role('anon');
   assert.equal((await db.query('select * from public.matumarket_promotions')).rows.length,1); checks++;
   await role('authenticated',admin);
-  const replacement = {categories:['Nueva'],products:[{id:'new',name:'Nuevo',category:'Nueva',unit:'1 kg',price:7.5,image:'https://example.com/image.webp',active:true}]};
+  await db.exec("update public.matumarket_products set in_stock=false where id='public'");
+  await role('anon');
+  assert.equal((await db.query("select in_stock from public.matumarket_products where id='public'")).rows[0].in_stock,false); checks++;
+  await role('authenticated',admin);
+  await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{openingTime}','\"25:00\"')");
+  await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{openingDays}','[8]')");
+  await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{storeMode}','\"open-forever\"')");
+  await db.exec("update public.matumarket_store_settings set settings=settings || '{\"openingTime\":\"07:00\",\"closingTime\":\"22:00\",\"openingDays\":[1,2,3,4,5],\"storeMode\":\"closed\"}'"); checks++;
+  const replacement = {categories:['Nueva'],products:[{id:'new',name:'Nuevo',category:'Nueva',unit:'1 kg',price:7.5,image:'https://example.com/image.webp',active:true,in_stock:false}]};
   await db.query('select public.matumarket_replace_catalog($1::jsonb)',[JSON.stringify(replacement)]);
   assert.equal((await db.query('select * from public.matumarket_products')).rows.length,1); checks++;
+  assert.equal((await db.query('select in_stock from public.matumarket_products')).rows[0].in_stock,false); checks++;
   await db.exec('update public.matumarket_promotions set active=false');
   assert.equal((await db.query('select active from public.matumarket_promotions')).rows[0].active,false); checks++;
   await db.exec('reset role');await db.query('delete from public.matumarket_admins where user_id=$1',[admin]);

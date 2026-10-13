@@ -18,7 +18,7 @@ export default function PromotionsPanel({products}) {
   async function save(event){event.preventDefault();setBusy(true);setSaveError('');try{
     const value=validatePromotion({...draft,starts_at:instant(draft.starts_at),ends_at:instant(draft.ends_at)});
     if(value.price>=Math.round(regularPrice*100)/100)throw Error('El precio promocional debe ser menor al precio habitual.');
-    if(value.active&&value.items.some(i=>!products.find(p=>p.id===i.productId&&p.active)))throw Error('Activa los productos incluidos antes de publicar la promoción.');
+    if(value.active&&value.items.some(i=>!products.find(p=>p.id===i.productId&&p.active&&p.in_stock!==false)))throw Error('Los productos deben estar visibles y disponibles antes de publicar la promoción.');
     await savePromotion(value);setDraft(null);setMessage('Promoción guardada. Solo aparecerá si está activa, vigente y sus productos están disponibles.');
   }catch(e){setSaveError(e.message);}finally{setBusy(false);}}
   async function disable(p){setBusy(true);setSaveError('');try{await savePromotion({...p,active:false});setMessage('Promoción desactivada.');}catch(e){setSaveError(e.message);}finally{setBusy(false);}}
