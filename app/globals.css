@@ -20,3 +20,5 @@
 .sold-out-badge{display:inline-block;border-radius:20px;background:#eee9df;color:#655c4b;padding:4px 10px;font-size:12px;font-weight:700;margin:0 0 10px}.sold-out-product .product-art img{opacity:.65}.product .add:disabled{background:#ddd;color:#777;cursor:not-allowed;box-shadow:none}.store-closed-banner{display:flex;gap:14px;align-items:flex-start;padding:20px;border:1px solid #dfd4ae;background:#fff8df;border-radius:16px;margin:20px 0}.store-closed-banner>svg{flex-shrink:0;margin-top:3px}.store-closed-banner p{font-size:14px;line-height:1.6;margin:6px 0}.store-closed-banner small{font-size:12px}.opening-days{display:flex;gap:12px;flex-wrap:wrap}.opening-days .checkbox-field{margin:4px 0 12px}
 
 .product-content .stock-count{display:block;color:#174d38;font-size:12px;font-weight:700;margin-bottom:10px}.primary:disabled,.add:disabled{opacity:.55;cursor:not-allowed}
+
+.category-group-actions{display:flex;gap:16px;align-items:center;flex-wrap:wrap}@media(max-width:640px){.category-group>header{flex-wrap:wrap;gap:12px}.category-group-actions{gap:12px}}

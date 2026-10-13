@@ -47,7 +47,8 @@ export default function Home() {
   const zoneFee = deliveryZone === 'center' ? settings.centerDeliveryFee : settings.deliveryFee;
   const pendingZone = delivery === 'delivery' && !deliveryZone;
   const fee = delivery === 'delivery' && count && !pendingZone ? zoneFee : 0;
-  const visible = products.filter(p => (category === 'Todo' || p.category === category) && p.name.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
+  const effectiveCategory = categories.includes(category) ? category : 'Todo';
+  const visible = products.filter(p => (effectiveCategory === 'Todo' || p.category === effectiveCategory) && p.name.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
 
   function change(id, delta) {
     setCart(previous => { const next = { ...previous, [id]: Math.max(0, (previous[id] || 0) + delta) }; return delta > 0 && stockProblems(next,catalog,promotions).length ? previous : next; });
@@ -115,7 +116,7 @@ export default function Home() {
           <section id="catalogo" className="catalog">
             <div className="section-heading"><div><span className="eyebrow">TU DESPENSA, CON UN CLIC</span><h2>Encuentra tus favoritos</h2></div><span>{visible.length} productos</span></div>
             <label className="search"><Icon name="search"/><span className="sr-only">Buscar productos</span><input type="search" placeholder="¿Qué necesitas hoy?" value={search} onChange={e => setSearch(e.target.value)} /></label>
-            <div className="categories" aria-label="Categorías">{categories.map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => setCategory(c)}>{c}</button>)}</div>
+            <div className="categories" aria-label="Categorías">{categories.map(c => <button key={c} aria-pressed={effectiveCategory === c} className={effectiveCategory === c ? 'active' : ''} onClick={() => setCategory(c)}>{c}</button>)}</div>
             <div className="products">{visible.map(p => <article className={`product ${p.in_stock === false ? 'sold-out-product' : ''}`} key={p.id}><div className="product-art"><span className="product-category-tag">{p.category}</span><ProductImage key={p.image} src={p.image} name={p.name}/></div><div className="product-content"><small>{p.category}</small><h3>{p.name}</h3><p>{p.unit}</p>{p.stock_quantity !== null && p.stock_quantity !== undefined && p.in_stock !== false && <small className="stock-count">Disponible: {p.stock_quantity} {p.stock_quantity === 1 ? 'unidad' : 'unidades'}</small>}{p.in_stock === false && <span className="sold-out-badge">Agotado</span>}<div className="product-bottom"><strong>{money(p.price)}</strong><button className="add" disabled={p.in_stock === false || stockProblems({...cart,[`product:${p.id}`]:(cart[`product:${p.id}`]||0)+1},catalog,promotions).length > 0} aria-label={p.in_stock === false ? `${p.name} agotado` : `Agregar ${p.name}`} onClick={() => change(`product:${p.id}`, 1)}><Icon name="plus" size={18}/></button></div></div></article>)}</div>
             {!visible.length && <p className="empty">No encontramos productos. Prueba otra búsqueda o categoría.</p>}
           </section>

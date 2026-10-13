@@ -109,6 +109,12 @@ try {
   await deny("update public.matumarket_store_settings set settings=jsonb_set(settings,'{storeMode}','\"open-forever\"')");
   await db.exec("update public.matumarket_store_settings set settings=settings || '{\"openingTime\":\"07:00\",\"closingTime\":\"22:00\",\"openingDays\":[1,2,3,4,5],\"storeMode\":\"closed\"}'"); checks++;
   await db.exec("update public.matumarket_products set stock_quantity=5 where id='public'; update public.matumarket_products set stock_quantity=4 where id='hidden'");
+  await db.exec("update public.matumarket_categories set name='Bebidas y refrescos' where name='Bebidas'");
+  assert.equal((await db.query("select count(*) as n from public.matumarket_products where category='Bebidas y refrescos'")).rows[0].n,2); checks++;
+  assert.equal((await db.query("select stock_quantity from public.matumarket_products where id='public'")).rows[0].stock_quantity,5); checks++;
+  await role('authenticated',customer);
+  assert.equal((await db.query("update public.matumarket_categories set name='Intruso' where name='Bebidas y refrescos' returning name")).rows.length,0); checks++;
+  await role('authenticated',admin);
   const saleId='00000000-0000-4000-8000-000000000077';
   const saleItems=JSON.stringify([{productId:'public',qty:2},{productId:'hidden',qty:1}]);
   await role('anon'); await deny('select public.matumarket_confirm_sale($1,$2)',[saleId,saleItems]);
